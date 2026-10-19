@@ -1,0 +1,515 @@
+openapi: 3.0.3
+
+info:
+  title: API de Tienda y Merchandising - Subsonic Festival
+  version: 1.1.0
+  description: >
+    API responsable de la gestión de la tienda oficial, productos físicos,
+    control de stock e inventario por tallas y procesamiento de pedidos.
+
+    El microservicio de Tienda es propietario del catálogo de merchandising y los pedidos.
+    Para realizar sus operaciones se comunica de forma síncrona con:
+    - Autenticación y Cuentas: consulta GET /users/{userId} para validar que el cliente
+      que efectúa la compra existe, está activo y posee los permisos correspondientes.
+
+servers:
+  - url: https://api.subsonic.com/commerce/v1
+    description: Servidor de desarrollo
+
+tags:
+  - name: Productos
+    description: Catálogo de artículos, tallas, precios y control de stock
+  - name: Pedidos
+    description: Procesamiento de compras (checkout) y seguimiento de pedidos
+
+paths:
+  /products:
+    get:
+      tags:
+        - Productos
+      summary: Listar productos del catálogo
+      description: >
+        Devuelve el catálogo de merchandising disponible para compra. Permite filtrado por categoría.
+      operationId: getProducts
+      parameters:
+        - name: category
+          in: query
+          description: Filtra productos por categoría (ej. ropa, accesorios).
+          schema:
+            type: string
+          example: "ropa"
+      responses:
+        '200':
+          description: Lista de productos devuelta con éxito.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+    post:
+      tags:
+        - Productos
+      summary: Crear un nuevo producto
+      description: >
+        Añade un nuevo artículo al catálogo con sus tallas y stock inicial.
+        Operación exclusiva para administradores.
+      operationId: createProduct
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        description: Datos del producto y desglose de inventario.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+      responses:
+        '201':
+          description: Producto dado de alta satisfactoriamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          description: Información del producto incompleta o con formatos erróneos.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Acceso denegado. Requiere rol de administrador.
+
+  /products/{id}:
+    get:
+      tags:
+        - Productos
+      summary: Consultar detalle de un producto
+      description: >
+        Devuelve la ficha detallada de un producto de la tienda y su stock por talla.
+      operationId: getProductById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador único del producto en el catálogo.
+          schema:
+            type: string
+          example: "prod_001"
+      responses:
+        '200':
+          description: Producto encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: El producto con el identificador indicado no existe.
+    put:
+      tags:
+        - Productos
+      summary: Actualizar información o stock de un producto
+      description: >
+        Actualiza precio, imágenes o stock disponible de un artículo. Exclusivo para administradores.
+      operationId: updateProduct
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador del producto a modificar.
+          schema:
+            type: string
+          example: "prod_001"
+      requestBody:
+        required: true
+        description: Campos a modificar del producto.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+      responses:
+        '200':
+          description: Producto actualizado correctamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '401':
+          description: No autenticado.
+        '403':
+          description: Acceso denegado.
+        '404':
+          description: El producto especificado no existe.
+    delete:
+      tags:
+        - Productos
+      summary: Retirar un producto del catálogo
+      description: >
+        Elimina un artículo de la tienda oficial. Operación exclusiva para administradores.
+      operationId: deleteProduct
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador del producto a retirar.
+          schema:
+            type: string
+          example: "prod_001"
+      responses:
+        '204':
+          description: Producto eliminado exitosamente.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Acceso denegado.
+        '404':
+          description: El producto no existe.
+
+  /orders:
+    post:
+      tags:
+        - Pedidos
+      summary: Crear un nuevo pedido (Checkout)
+      description: >
+        Procesa la compra de los artículos enviados en el carrito y decrementa el stock disponible.
+
+        Antes de crear el pedido, este microservicio realiza una COMUNICACIÓN SÍNCRONA
+        de tipo CONSULTA:
+
+        Tienda -> Autenticación y Cuentas -> GET /users/{userId}
+
+        Esto valida que el usuario existe y está autorizado a operar.
+      operationId: createOrder
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        description: Información de artículos, dirección de envío y referencia del comprador.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRequest'
+      responses:
+        '201':
+          description: Pedido registrado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Petición incorrecta o datos de envío incompletos.
+        '401':
+          description: No autenticado. Token JWT ausente o inválido.
+        '404':
+          description: >
+            El usuario indicado no existe. Este error se produce tras la consulta
+            al microservicio de Autenticación y Cuentas.
+        '409':
+          description: Conflicto de inventario. No hay suficiente stock en las tallas seleccionadas.
+        '503':
+          description: >
+            No se pudo validar al usuario porque el microservicio de Autenticación y Cuentas
+            no está disponible.
+
+  /orders/user/{userId}:
+    get:
+      tags:
+        - Pedidos
+      summary: Consultar historial de pedidos de un usuario
+      description: >
+        Devuelve el histórico de compras efectuadas por el cliente.
+      operationId: getOrdersByUser
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: Identificador del usuario propietario de los pedidos.
+          schema:
+            type: string
+          example: "usr_555"
+      responses:
+        '200':
+          description: Historial de pedidos devuelto correctamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401':
+          description: No autenticado.
+        '403':
+          description: No autorizado para consultar pedidos de otro cliente.
+
+  /orders/{id}:
+    get:
+      tags:
+        - Pedidos
+      summary: Consultar el estado y detalle de un pedido
+      description: >
+        Devuelve la información completa de una orden de compra por su identificador.
+      operationId: getOrderById
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador único del pedido.
+          schema:
+            type: string
+          example: "ord_112233"
+      responses:
+        '200':
+          description: Detalle del pedido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          description: No autenticado.
+        '404':
+          description: No existe ningún pedido con el identificador indicado.
+
+  /orders/{id}/status:
+    put:
+      tags:
+        - Pedidos
+      summary: Actualizar estado logístico de un pedido
+      description: >
+        Modifica el estado del envío del paquete (paid, shipped, delivered, cancelled).
+        Operación reservada para administradores del festival.
+      operationId: updateOrderStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador del pedido que cambiará de estado.
+          schema:
+            type: string
+          example: "ord_112233"
+      requestBody:
+        required: true
+        description: Nuevo estado logístico.
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [pending, paid, preparing, shipped, delivered, cancelled]
+                  description: Estado de preparación o envío.
+                  example: "shipped"
+      responses:
+        '200':
+          description: Estado del pedido modificado correctamente.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Acceso denegado. Requiere rol de administrador.
+        '404':
+          description: El pedido indicado no existe.
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ProductVariant:
+      type: object
+      required:
+        - size
+        - stock
+      properties:
+        size:
+          type: string
+          description: Talla del producto (ej. S, M, L, XL).
+          example: "M"
+        stock:
+          type: integer
+          description: Cantidad física de existencias en el almacén.
+          example: 150
+
+    CreateProductRequest:
+      type: object
+      required:
+        - name
+        - price
+        - category
+      properties:
+        name:
+          type: string
+          description: Nombre comercial del artículo.
+          example: "Sudadera Oficial Subsonic 2026"
+        description:
+          type: string
+          description: Descripción física del producto.
+          example: "Sudadera con capucha y logotipo bordado."
+        category:
+          type: string
+          description: Categoría del catálogo.
+          example: "ropa"
+        price:
+          type: number
+          format: float
+          description: Precio unitario en euros.
+          example: 45.00
+        images:
+          type: array
+          description: Lista de URLs de fotografías del producto.
+          items:
+            type: string
+            format: uri
+          example: ["https://api.subsonic.com/assets/hoodie1.jpg"]
+        variants:
+          type: array
+          description: Variantes de inventario por talla.
+          items:
+            $ref: '#/components/schemas/ProductVariant'
+
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - price
+        - category
+      properties:
+        id:
+          type: string
+          description: Identificador único del producto en este microservicio.
+          example: "prod_001"
+        name:
+          type: string
+          description: Nombre del artículo.
+          example: "Sudadera Oficial Subsonic 2026"
+        description:
+          type: string
+          description: Descripción del producto.
+          example: "Sudadera con capucha y logotipo bordado."
+        category:
+          type: string
+          description: Categoría del artículo.
+          example: "ropa"
+        price:
+          type: number
+          format: float
+          description: Precio en euros.
+          example: 45.00
+        images:
+          type: array
+          description: Fotografías promocionales.
+          items:
+            type: string
+            format: uri
+          example: ["https://api.subsonic.com/assets/hoodie1.jpg"]
+        variants:
+          type: array
+          description: Variantes disponibles en stock.
+          items:
+            $ref: '#/components/schemas/ProductVariant'
+
+    OrderItem:
+      type: object
+      required:
+        - product_id
+        - size
+        - quantity
+        - unit_price
+      properties:
+        product_id:
+          type: string
+          description: Identificador del producto comprado. Pertenece a este microservicio.
+          example: "prod_001"
+        size:
+          type: string
+          description: Talla seleccionada por el comprador.
+          example: "M"
+        quantity:
+          type: integer
+          description: Número de unidades adquiridas.
+          example: 2
+        unit_price:
+          type: number
+          format: float
+          description: Precio unitario aplicado al momento de la compra.
+          example: 45.00
+
+    OrderRequest:
+      type: object
+      required:
+        - user_id
+        - items
+        - shipping_address
+      properties:
+        user_id:
+          type: string
+          description: >
+            Identificador del usuario que realiza la compra. El dato pertenece
+            al microservicio de Autenticación y Cuentas y es usado como referencia.
+          example: "usr_555"
+        items:
+          type: array
+          minItems: 1
+          description: Lista de artículos solicitados.
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        shipping_address:
+          type: string
+          description: Dirección física para la entrega del paquete.
+          example: "Calle Mayor 12, 3B, 28001, Madrid"
+        payment_method_id:
+          type: string
+          description: Token o identificador del método de pago utilizado.
+          example: "pm_card_987"
+
+    Order:
+      type: object
+      required:
+        - id
+        - user_id
+        - items
+        - total_price
+        - status
+        - created_at
+      properties:
+        id:
+          type: string
+          description: Identificador único del pedido en este microservicio.
+          example: "ord_112233"
+        user_id:
+          type: string
+          description: Identificador del comprador (referencia hacia Autenticación y Cuentas).
+          example: "usr_555"
+        items:
+          type: array
+          description: Desglose de artículos que componen el pedido.
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        total_price:
+          type: number
+          format: float
+          description: Importe total del pedido en euros.
+          example: 90.00
+        status:
+          type: string
+          enum: [pending, paid, preparing, shipped, delivered, cancelled]
+          description: Estado del pedido.
+          example: "paid"
+        created_at:
+          type: string
+          format: date-time
+          description: Fecha y hora exacta de registro de la compra.
+          example: "2026-09-28T19:30:00Z"

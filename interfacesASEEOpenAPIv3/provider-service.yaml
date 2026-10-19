@@ -1,0 +1,637 @@
+openapi: 3.0.3
+
+info:
+  title: API de Gestión de Proveedores - Subsonic Festival
+  version: 1.2.0
+  description: >
+    API responsable de la gestión de proveedores externos, catálogo de servicios
+    (sonido, escenarios, barras), espacios alquilables por evento y presupuestos.
+
+    El microservicio de Gestión de Proveedores es propietario de las propuestas y servicios B2B.
+    Para operar se comunica con los siguientes microservicios:
+    - Autenticación y Cuentas: realiza una consulta síncrona GET /users/{userId} para verificar
+      identidad, rol y permisos (provider o admin) antes de gestionar solicitudes.
+    - Gestión de Eventos: realiza una consulta síncrona GET /events/{eventId} para obtener
+      información de fechas y recintos del festival al cual se asigna un espacio o servicio.
+
+servers:
+  - url: https://api.subsonic.com/providers/v1
+    description: Servidor de desarrollo
+
+tags:
+  - name: Proveedores
+    description: Gestión y fichas de empresas proveedoras registradas
+  - name: Servicios y Espacios
+    description: Catálogo de servicios técnicos y zonas alquilables por recinto
+  - name: Presupuestos y Solicitudes
+    description: Flujo de presupuestos, propuestas y asignación a festivales
+
+paths:
+  /providers:
+    get:
+      tags:
+        - Proveedores
+      summary: Listar proveedores registrados
+      description: >
+        Devuelve el listado de empresas proveedoras colaboradoras. Operación para administradores.
+      operationId: getProviders
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de proveedores obtenida correctamente.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProviderProfile'
+        '401':
+          description: No autenticado.
+        '403':
+          description: Acceso denegado. Requiere rol de administrador.
+    post:
+      tags:
+        - Proveedores
+      summary: Registrar ficha de proveedor
+      description: >
+        Crea la ficha de empresa de un proveedor.
+
+        Antes de registrar al proveedor, este microservicio realiza una COMUNICACIÓN SÍNCRONA
+        de tipo CONSULTA:
+
+        Gestión de Proveedores -> Autenticación y Cuentas -> GET /users/{userId}
+
+        para verificar que el usuario existe y posee el rol 'provider'.
+      operationId: createProvider
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        description: Datos fiscales y de contacto de la empresa.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProviderRequest'
+      responses:
+        '201':
+          description: Proveedor registrado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderProfile'
+        '400':
+          description: Datos de registro incompletos o inválidos.
+        '401':
+          description: No autenticado.
+        '404':
+          description: >
+            El usuario asociado no existe según la consulta al microservicio de Autenticación.
+        '503':
+          description: >
+            No se pudo validar el usuario porque el microservicio de Autenticación no está disponible.
+
+  /providers/{id}:
+    get:
+      tags:
+        - Proveedores
+      summary: Consultar detalle de un proveedor
+      description: >
+        Devuelve la ficha con datos de contacto, fiscales y servicios de una empresa proveedora.
+      operationId: getProviderById
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador único del proveedor.
+          schema:
+            type: string
+          example: "prov_001"
+      responses:
+        '200':
+          description: Detalle del proveedor encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderProfile'
+        '401':
+          description: No autenticado.
+        '404':
+          description: Proveedor no encontrado.
+
+  /external-services:
+    get:
+      tags:
+        - Servicios y Espacios
+      summary: Consultar catálogo de servicios externos
+      description: >
+        Devuelve el catálogo de tipos de servicios requeridos (escenarios, sonido, barras, iluminación).
+      operationId: getExternalServices
+      responses:
+        '200':
+          description: Catálogo de servicios.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExternalService'
+    post:
+      tags:
+        - Servicios y Espacios
+      summary: Crear un nuevo tipo de servicio externo
+      description: >
+        Añade un nuevo tipo de servicio al catálogo. Operación exclusiva de administradores.
+      operationId: createExternalService
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        description: Información del servicio.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExternalServiceRequest'
+      responses:
+        '201':
+          description: Servicio externo creado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalService'
+        '401':
+          description: No autenticado.
+        '403':
+          description: Requiere rol de administrador.
+
+  /spaces:
+    get:
+      tags:
+        - Servicios y Espacios
+      summary: Listar espacios alquilables de un evento
+      description: >
+        Devuelve las zonas disponibles para proveedores en un festival específico.
+      operationId: getSpacesByEvent
+      parameters:
+        - name: event_id
+          in: query
+          required: true
+          description: >
+            Identificador del evento al que corresponden los espacios.
+            Referencia hacia el microservicio de Gestión de Eventos.
+          schema:
+            type: string
+          example: "evt_101"
+      responses:
+        '200':
+          description: Lista de espacios devuelta con éxito.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Space'
+    post:
+      tags:
+        - Servicios y Espacios
+      summary: Publicar un espacio alquilable en un evento
+      description: >
+        Registra una zona alquilable en el recinto de un festival.
+
+        Antes de registrar el espacio, este microservicio realiza una COMUNICACIÓN SÍNCRONA
+        de tipo CONSULTA:
+
+        Gestión de Proveedores -> Gestión de Eventos -> GET /events/{eventId}
+
+        para validar que el evento existe y obtener su información de recinto.
+      operationId: createSpace
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        description: Información técnica y precio del espacio.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSpaceRequest'
+      responses:
+        '201':
+          description: Espacio publicado exitosamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Space'
+        '401':
+          description: No autenticado.
+        '403':
+          description: Requiere rol de administrador.
+        '404':
+          description: >
+            El evento especificado no existe según la consulta a Gestión de Eventos.
+        '503':
+          description: >
+            No se pudo validar el evento porque el microservicio de Gestión de Eventos
+            no está disponible.
+
+  /requests:
+    post:
+      tags:
+        - Presupuestos y Solicitudes
+      summary: Enviar propuesta de presupuesto para un espacio
+      description: >
+        El proveedor envía una cotización para cubrir un servicio o alquilar un espacio.
+
+        Antes de crear la solicitud, este microservicio realiza dos COMUNICACIONES SÍNCRONAS
+        de tipo CONSULTA:
+
+        1. Gestión de Proveedores -> Autenticación y Cuentas -> GET /users/{userId} (Valida permisos del proveedor).
+        2. Gestión de Proveedores -> Gestión de Eventos -> GET /events/{eventId} (Valida vigencia del festival).
+      operationId: createSpaceProposal
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        description: Presupuesto propuesto y fechas de montaje.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSpaceProposalRequest'
+      responses:
+        '201':
+          description: Propuesta enviada correctamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpaceProposal'
+        '400':
+          description: Petición incorrecta o montos inválidos.
+        '401':
+          description: No autenticado.
+        '404':
+          description: >
+            El proveedor o el evento no existen tras consultar a sus respectivos microservicios.
+        '503':
+          description: >
+            No se pudo procesar la propuesta porque alguno de los microservicios
+            dependientes (Autenticación o Eventos) no se encuentra disponible.
+
+  /requests/provider/{providerId}:
+    get:
+      tags:
+        - Presupuestos y Solicitudes
+      summary: Ver propuestas enviadas por un proveedor
+      description: >
+        Devuelve el histórico de presupuestos presentados por una empresa colaboradora.
+      operationId: getProposalsByProvider
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          description: Identificador del proveedor.
+          schema:
+            type: string
+          example: "prov_001"
+      responses:
+        '200':
+          description: Historial de propuestas del proveedor.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SpaceProposal'
+        '401':
+          description: No autenticado.
+        '403':
+          description: Acceso denegado a las propuestas de este proveedor.
+
+  /requests/event/{eventId}:
+    get:
+      tags:
+        - Presupuestos y Solicitudes
+      summary: Listar propuestas recibidas para un festival
+      description: >
+        Devuelve los presupuestos recibidos para un evento concreto. Operación para administradores.
+      operationId: getProposalsByEvent
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          description: >
+            Identificador del evento consultado (referencia a Gestión de Eventos).
+          schema:
+            type: string
+          example: "evt_101"
+      responses:
+        '200':
+          description: Lista de propuestas a evaluar.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SpaceProposal'
+        '401':
+          description: No autenticado.
+        '403':
+          description: Requiere rol de administrador.
+
+  /requests/{id}/status:
+    put:
+      tags:
+        - Presupuestos y Solicitudes
+      summary: Aprobar o rechazar presupuesto (Asignación)
+      description: >
+        Actualiza el estado de la propuesta (approved / rejected) y asigna formalmente
+        al proveedor para el evento. Operación reservada para administradores.
+      operationId: updateProposalStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador de la propuesta de presupuesto.
+          schema:
+            type: string
+          example: "req_9988"
+      requestBody:
+        required: true
+        description: Resolución de la propuesta.
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [pending, approved, rejected]
+                  description: Estado de asignación del presupuesto.
+                  example: "approved"
+      responses:
+        '200':
+          description: Estado del presupuesto actualizado.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Requiere rol de administrador.
+        '404':
+          description: La propuesta indicada no existe.
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    CreateProviderRequest:
+      type: object
+      required:
+        - user_id
+        - company_name
+        - cif_nif
+        - service_category
+        - contact_email
+      properties:
+        user_id:
+          type: string
+          description: >
+            Identificador del usuario en el microservicio de Autenticación y Cuentas
+            al que se vinculará la ficha de la empresa proveedora.
+          example: "usr_555"
+        company_name:
+          type: string
+          description: Nombre fiscal de la empresa.
+          example: "Sonido e Iluminación Total S.L."
+        cif_nif:
+          type: string
+          description: Identificador fiscal (CIF o NIF).
+          example: "B12345678"
+        service_category:
+          type: string
+          description: Categoría del servicio ofertado (Sonido, Barras, Escenarios).
+          example: "Sonido"
+        contact_email:
+          type: string
+          format: email
+          description: Correo electrónico comercial de contacto.
+          example: "contacto@sonidototal.com"
+
+    ProviderProfile:
+      type: object
+      required:
+        - id
+        - user_id
+        - company_name
+        - cif_nif
+        - service_category
+      properties:
+        id:
+          type: string
+          description: Identificador único del proveedor en este microservicio.
+          example: "prov_001"
+        user_id:
+          type: string
+          description: Identificador del usuario propietario (Autenticación y Cuentas).
+          example: "usr_555"
+        company_name:
+          type: string
+          description: Denominación comercial o razón social.
+          example: "Sonido e Iluminación Total S.L."
+        cif_nif:
+          type: string
+          description: Número de identificación fiscal.
+          example: "B12345678"
+        service_category:
+          type: string
+          description: Categoría de servicio principal.
+          example: "Sonido"
+        contact_email:
+          type: string
+          format: email
+          description: Email de contacto.
+          example: "contacto@sonidototal.com"
+
+    CreateExternalServiceRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Nombre del tipo de servicio externo.
+          example: "Instalación de Sonido Profesional"
+        description:
+          type: string
+          description: Descripción de requerimientos técnicos del servicio.
+          example: "Equipos de sonido de alta potencia para escenarios principales."
+
+    ExternalService:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          description: Identificador del servicio externo en este microservicio.
+          example: "srv_01"
+        name:
+          type: string
+          description: Nombre del tipo de servicio.
+          example: "Instalación de Sonido Profesional"
+        description:
+          type: string
+          description: Descripción técnica.
+          example: "Equipos de sonido de alta potencia para escenarios principales."
+
+    CreateSpaceRequest:
+      type: object
+      required:
+        - event_id
+        - name
+        - base_price
+      properties:
+        event_id:
+          type: string
+          description: >
+            Identificador del evento al que pertenece el espacio. Pertenece
+            al microservicio de Gestión de Eventos y se usa como referencia.
+          example: "evt_101"
+        name:
+          type: string
+          description: Nombre descriptivo del espacio.
+          example: "Escenario Principal - Zona de Sonido"
+        dimensions:
+          type: string
+          description: Medidas y superficie del espacio disponible.
+          example: "20m x 15m"
+        base_price:
+          type: number
+          format: float
+          description: Tarifa base de alquiler del espacio en euros.
+          example: 1200.00
+        is_available:
+          type: boolean
+          description: Disponibilidad del espacio para alquiler.
+          example: true
+
+    Space:
+      type: object
+      required:
+        - id
+        - event_id
+        - name
+        - base_price
+        - is_available
+      properties:
+        id:
+          type: string
+          description: Identificador único del espacio en este microservicio.
+          example: "spc_010"
+        event_id:
+          type: string
+          description: Referencia foránea hacia Gestión de Eventos.
+          example: "evt_101"
+        name:
+          type: string
+          description: Nombre de la zona o espacio.
+          example: "Escenario Principal - Zona de Sonido"
+        dimensions:
+          type: string
+          description: Medidas del espacio.
+          example: "20m x 15m"
+        base_price:
+          type: number
+          format: float
+          description: Precio base de alquiler.
+          example: 1200.00
+        is_available:
+          type: boolean
+          description: Indica si el espacio está libre para nuevas propuestas.
+          example: true
+
+    CreateSpaceProposalRequest:
+      type: object
+      required:
+        - space_id
+        - provider_id
+        - event_id
+        - budget_proposal
+      properties:
+        space_id:
+          type: string
+          description: Identificador del espacio por el que se puja (pertenece a este microservicio).
+          example: "spc_010"
+        provider_id:
+          type: string
+          description: Identificador del proveedor solicitante (pertenece a este microservicio).
+          example: "prov_001"
+        event_id:
+          type: string
+          description: >
+            Identificador del festival al que corresponde la propuesta.
+            Pertenece al microservicio de Gestión de Eventos.
+          example: "evt_101"
+        budget_proposal:
+          type: number
+          format: float
+          description: Importe total presupuestado en euros.
+          example: 1150.00
+        setup_date:
+          type: string
+          format: date
+          description: Fecha planificada de montaje en el recinto.
+          example: "2027-07-18"
+
+    SpaceProposal:
+      type: object
+      required:
+        - id
+        - space_id
+        - provider_id
+        - event_id
+        - budget_proposal
+        - status
+      properties:
+        id:
+          type: string
+          description: Identificador único de la propuesta de presupuesto.
+          example: "req_9988"
+        space_id:
+          type: string
+          description: Identificador del espacio.
+          example: "spc_010"
+        provider_id:
+          type: string
+          description: Identificador del proveedor.
+          example: "prov_001"
+        event_id:
+          type: string
+          description: Referencia al evento (Gestión de Eventos).
+          example: "evt_101"
+        budget_proposal:
+          type: number
+          format: float
+          description: Presupuesto ofertado.
+          example: 1150.00
+        setup_date:
+          type: string
+          format: date
+          description: Fecha de montaje propuesta.
+          example: "2027-07-18"
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+          description: Estado del proceso de evaluación del presupuesto.
+          example: "pending"
