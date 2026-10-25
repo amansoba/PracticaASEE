@@ -1,0 +1,17 @@
+# Variables de entorno y credenciales
+.env
+.env.*
+!.env.example
+
+# Entornos virtuales
+.venv/
+venv/
+
+# Cache de Python y pytest
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+
+# Archivos temporales
+*.log
