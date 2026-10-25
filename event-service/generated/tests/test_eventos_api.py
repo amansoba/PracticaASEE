@@ -1,113 +1,150 @@
-# coding: utf-8
+
+import pytest
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+
+from openapi_server.database import SessionLocal
+from openapi_server.db_models import EventDB
 
 
-from pydantic import Field  # noqa: F401
-from typing import Any, List  # noqa: F401
-from typing_extensions import Annotated  # noqa: F401
-from openapi_server.models.create_event_request import CreateEventRequest  # noqa: F401
-from openapi_server.models.event import Event  # noqa: F401
+# Token provisional para pruebas locales
+HEADERS = {
+    "Authorization": "Bearer dev-test-only"
+}
 
 
+# Datos utilizados para crear festivales de prueba
+DATOS_EVENTO = {
+    "name": "Subsonic Festival Test",
+    "start_date": "2027-07-20",
+    "end_date": "2027-07-22",
+    "venue": "Recinto de Pruebas",
+    "location_city": "Madrid"
+}
+
+
+@pytest.fixture
+def eventos_prueba():
+    # Guardar los identificadores creados durante cada test
+    ids_creados = []
+
+    yield ids_creados
+
+    # Eliminar exclusivamente los eventos creados por este test
+    with SessionLocal() as db:
+        for evento_id in ids_creados:
+            evento = db.get(EventDB, evento_id)
+
+            if evento is not None:
+                db.delete(evento)
+
+        db.commit()
+
+
+def crear_evento(client: TestClient, eventos_prueba):
+    # Crear un festival y registrar su ID para limpiarlo despues
+    response = client.post(
+        "/events",
+        json=DATOS_EVENTO,
+        headers=HEADERS
+    )
+
+    assert response.status_code == 201
+
+    evento = response.json()
+    eventos_prueba.append(evento["id"])
+
+    return evento
+
+
+# TEST 1: GET /events
 def test_get_all_events(client: TestClient):
-    """Test case for get_all_events
 
-    Listar todos los festivales y eventos
-    """
+    response = client.get("/events")
 
-    headers = {
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+# TEST 2: POST /events
+def test_create_event(
+    client: TestClient,
+    eventos_prueba
+):
+
+    evento = crear_evento(client, eventos_prueba)
+
+    assert evento["name"] == DATOS_EVENTO["name"]
+    assert evento["venue"] == DATOS_EVENTO["venue"]
+    assert evento["location_city"] == DATOS_EVENTO["location_city"]
+    assert evento["id"].startswith("evt_")
+
+
+# TEST 3: GET /events/{id}
+def test_get_event_by_id(
+    client: TestClient,
+    eventos_prueba
+):
+
+    evento = crear_evento(client, eventos_prueba)
+
+    response = client.get(
+        f"/events/{evento['id']}"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == evento["id"]
+    assert response.json()["name"] == evento["name"]
+
+
+# TEST 4: PUT /events/{id}
+def test_update_event(
+    client: TestClient,
+    eventos_prueba
+):
+
+    evento = crear_evento(client, eventos_prueba)
+
+    datos_actualizados = {
+        "name": "Subsonic Festival Actualizado",
+        "start_date": "2027-07-20",
+        "end_date": "2027-07-23",
+        "venue": "Nuevo Recinto",
+        "location_city": "Barcelona"
     }
-    # uncomment below to make a request
-    #response = client.request(
-    #    "GET",
-    #    "/events",
-    #    headers=headers,
-    #)
 
-    # uncomment below to assert the status code of the HTTP response
-    #assert response.status_code == 200
+    response = client.put(
+        f"/events/{evento['id']}",
+        json=datos_actualizados,
+        headers=HEADERS
+    )
 
-
-def test_create_event(client: TestClient):
-    """Test case for create_event
-
-    Crear un nuevo evento o edición
-    """
-    create_event_request = openapi_server.CreateEventRequest()
-
-    headers = {
-        "Authorization": "Bearer special-key",
-    }
-    # uncomment below to make a request
-    #response = client.request(
-    #    "POST",
-    #    "/events",
-    #    headers=headers,
-    #    json=create_event_request,
-    #)
-
-    # uncomment below to assert the status code of the HTTP response
-    #assert response.status_code == 200
+    assert response.status_code == 200
+    assert response.json()["name"] == "Subsonic Festival Actualizado"
+    assert response.json()["location_city"] == "Barcelona"
+    assert response.json()["end_date"] == "2027-07-23"
 
 
-def test_get_event_by_id(client: TestClient):
-    """Test case for get_event_by_id
+# TEST 5: DELETE /events/{id}
+def test_delete_event(
+    client: TestClient,
+    eventos_prueba
+):
 
-    Consultar detalles de un evento
-    """
+    evento = crear_evento(client, eventos_prueba)
 
-    headers = {
-    }
-    # uncomment below to make a request
-    #response = client.request(
-    #    "GET",
-    #    "/events/{id}".format(id='evt_101'),
-    #    headers=headers,
-    #)
+    response = client.delete(
+        f"/events/{evento['id']}",
+        headers=HEADERS
+    )
 
-    # uncomment below to assert the status code of the HTTP response
-    #assert response.status_code == 200
+    assert response.status_code == 204
+    assert response.content == b""
 
+    # Comprobar que el evento ya no existe
+    response_get = client.get(
+        f"/events/{evento['id']}"
+    )
 
-def test_update_event(client: TestClient):
-    """Test case for update_event
-
-    Actualizar información de un evento
-    """
-    create_event_request = openapi_server.CreateEventRequest()
-
-    headers = {
-        "Authorization": "Bearer special-key",
-    }
-    # uncomment below to make a request
-    #response = client.request(
-    #    "PUT",
-    #    "/events/{id}".format(id='evt_101'),
-    #    headers=headers,
-    #    json=create_event_request,
-    #)
-
-    # uncomment below to assert the status code of the HTTP response
-    #assert response.status_code == 200
-
-
-def test_delete_event(client: TestClient):
-    """Test case for delete_event
-
-    Cancelar o eliminar un evento
-    """
-
-    headers = {
-        "Authorization": "Bearer special-key",
-    }
-    # uncomment below to make a request
-    #response = client.request(
-    #    "DELETE",
-    #    "/events/{id}".format(id='evt_101'),
-    #    headers=headers,
-    #)
-
-    # uncomment below to assert the status code of the HTTP response
-    #assert response.status_code == 200
-
+    assert response_get.status_code == 404

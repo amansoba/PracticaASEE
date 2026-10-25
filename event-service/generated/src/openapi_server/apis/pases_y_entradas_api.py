@@ -25,6 +25,7 @@ from fastapi import (  # noqa: F401
 from pydantic import Field
 from typing import Any, List
 from typing_extensions import Annotated
+from typing import Optional
 from openapi_server.models.create_pass_config_request import CreatePassConfigRequest
 from openapi_server.models.pass_config import PassConfig
 from openapi_server.models.ticket import Ticket
@@ -85,6 +86,7 @@ async def create_pass_config(
 
 @router.post(
     "/tickets/purchase",
+    status_code=201,
     responses={
         201: {"model": Ticket, "description": "Entrada emitida y asociada exitosamente al usuario."},
         400: {"description": "Datos de compra incompletos."},
@@ -97,16 +99,49 @@ async def create_pass_config(
     summary="Comprar una entrada / pase para un evento",
     response_model_by_alias=True,
 )
+
 async def purchase_ticket(
-    ticket_purchase_request: Annotated[TicketPurchaseRequest, Field(description="Identificadores del evento, tipo de pase, usuario y token de pago.")] = Body(..., description="Identificadores del evento, tipo de pase, usuario y token de pago."),
+    ticket_purchase_request: Annotated[
+        TicketPurchaseRequest,
+        Field(
+            description="Identificadores del evento, tipo de pase, usuario y token de pago."
+        )
+    ] = Body(
+        ...,
+        description="Identificadores del evento, tipo de pase, usuario y token de pago."
+    ),
     token_BearerAuth: TokenModel = Security(
         get_token_BearerAuth
     ),
+    authorization: Optional[str] = Header(
+        default=None
+    ),
 ) -> Ticket:
-    """Emite una entrada nominal y decrementa el aforo del pase. Antes de emitir la entrada, este microservicio realiza una COMUNICACIÓN SÍNCRONA de tipo CONSULTA: Gestión de Eventos -&gt; Autenticación y Cuentas -&gt; GET /users/{userId} para validar la identidad del comprador y asociar la entrada a su propietario. """
+    """
+    Emite una entrada nominal y decrementa el aforo.
+    Verifica el comprador mediante auth-service.
+    """
+
     if not BasePasesYEntradasApi.subclasses:
-        raise HTTPException(status_code=500, detail="Not implemented")
-    return await BasePasesYEntradasApi.subclasses[0]().purchase_ticket(ticket_purchase_request)
+        raise HTTPException(
+            status_code=500,
+            detail="Not implemented"
+        )
+
+    # Comprobar que el usuario autenticado es el comprador.
+    # Esta validacion se aplica tambien cuando la dependencia
+    # de autenticacion es sustituida durante las pruebas.
+    if ticket_purchase_request.user_id != token_BearerAuth.sub:
+        raise HTTPException(
+            status_code=403,
+            detail="El comprador debe ser el usuario autenticado"
+        )
+
+    return await BasePasesYEntradasApi.subclasses[0]().purchase_ticket(
+        ticket_purchase_request,
+        authorization
+    )
+
 
 
 @router.get(

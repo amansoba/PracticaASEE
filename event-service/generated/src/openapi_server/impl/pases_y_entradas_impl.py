@@ -113,7 +113,8 @@ class PasesYEntradasApiImpl(BasePasesYEntradasApi):
     # Emitir una entrada y descontar el aforo
     async def purchase_ticket(
         self,
-        ticket_purchase_request: TicketPurchaseRequest
+        ticket_purchase_request: TicketPurchaseRequest,
+        authorization: str | None = None
     ) -> Ticket:
 
         event_id = ticket_purchase_request.event_id
@@ -154,17 +155,37 @@ class PasesYEntradasApiImpl(BasePasesYEntradasApi):
                 detail="Servicio de autenticacion no configurado"
             )
 
-        # Verificar la existencia del comprador
+        # Comprobar que se ha recibido un token Bearer
+        if (
+            not authorization
+            or not authorization.startswith("Bearer ")
+            or not authorization.removeprefix("Bearer ").strip()
+        ):
+            raise HTTPException(
+                status_code=401,
+                detail="Token de autenticacion obligatorio"
+            )
+
+        # Verificar la existencia del comprador en auth-service
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 respuesta = await client.get(
-                    f"{auth_url.rstrip('/')}/users/{user_id}"
+                    f"{auth_url.rstrip('/')}/users/{user_id}",
+                    headers={
+                        "Authorization": authorization
+                    }
                 )
 
         except httpx.RequestError:
             raise HTTPException(
                 status_code=503,
                 detail="Servicio de autenticacion no disponible"
+            )
+
+        if respuesta.status_code in (401, 403):
+            raise HTTPException(
+                status_code=503,
+                detail="No se pudo autorizar la consulta del comprador"
             )
 
         if respuesta.status_code == 404:
@@ -223,7 +244,7 @@ class PasesYEntradasApiImpl(BasePasesYEntradasApi):
             pase.available_tickets -= 1
             db.add(nueva_entrada)
 
-            # Ambas operaciones se confirman juntas
+            # Confirmar ambas operaciones en la misma transaccion
             db.commit()
             db.refresh(nueva_entrada)
 

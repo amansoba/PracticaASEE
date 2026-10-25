@@ -58,6 +58,7 @@ async def get_event_lineup(
 
 @router.post(
     "/events/{id}/lineup",
+    status_code=201,
     responses={
         201: {"model": ScheduleEntry, "description": "Actuación añadida al cartel correctamente."},
         400: {"description": "Solapamiento horario o datos incorrectos."},
