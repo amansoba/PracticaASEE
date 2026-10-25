@@ -56,6 +56,7 @@ async def get_all_events(
 
 @router.post(
     "/events",
+    status_code=201,
     responses={
         201: {"model": Event, "description": "Evento registrado exitosamente."},
         400: {"description": "Datos del evento incompletos."},
@@ -124,6 +125,7 @@ async def update_event(
 
 @router.delete(
     "/events/{id}",
+    status_code=204,
     responses={
         204: {"description": "Evento eliminado satisfactoriamente."},
         401: {"description": "No autenticado."},
