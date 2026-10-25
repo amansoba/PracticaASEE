@@ -60,6 +60,7 @@ async def get_pass_configs_by_event(
 
 @router.post(
     "/events/{id}/passes",
+    status_code=201,
     responses={
         201: {"model": PassConfig, "description": "Modalidad de pase dada de alta exitosamente."},
         401: {"description": "No autenticado."},
