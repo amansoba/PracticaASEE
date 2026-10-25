@@ -1,0 +1,9 @@
+# Variables de entorno
+.env
+.env.*
+.venv/
+
+# Archivos temporales de Python
+__pycache__/
+*.pyc
+.pytest_cache/
