@@ -34,3 +34,5 @@ uvicorn==0.13.4
 uvloop==0.22.1; sys_platform != "win32"
 watchgod==0.7
 websockets==10.0
+SQLAlchemy==2.0.44
+psycopg[binary]==3.2.12
