@@ -1,0 +1,410 @@
+openapi: 3.0.3
+info:
+  description: |
+    API responsable de gestionar el catálogo musical, incluyendo fichas de artistas, biografías, géneros, catálogo de canciones e integración con la API de Spotify.
+    El microservicio de Catálogo Musical es el propietario de la información artística y discográfica. Proporciona información a otros microservicios: - Gestión de Eventos: consulta la información de los artistas mediante GET /artists/{id}
+      para validar su existencia y construir el line-up/horarios de cada festival.
+    - Se integra de forma externa con la API pública de Spotify para metadatos y preescuchas.
+  title: API de Catálogo Musical - Subsonic Festival
+  version: 1.2.0
+servers:
+- description: Servidor de desarrollo
+  url: https://api.subsonic.com/catalog/v1
+tags:
+- description: Fichas biográficas y catálogo de artistas musicales
+  name: Artistas
+- description: Catálogo de canciones y referencias externas de Spotify
+  name: Canciones
+paths:
+  /artists:
+    get:
+      description: |
+        Devuelve el catálogo de artistas con filtros opcionales de búsqueda y género musical. No requiere comunicación con otros microservicios.
+      operationId: getArtists
+      parameters:
+      - description: Filtrar artistas por género musical.
+        example: Electrónica
+        explode: true
+        in: query
+        name: genre
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Búsqueda por texto libre en el nombre del artista.
+        example: Daft
+        explode: true
+        in: query
+        name: search
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/Artist"
+                type: array
+          description: Lista de artistas devuelta correctamente.
+      summary: Consultar lista de artistas
+      tags:
+      - Artistas
+    post:
+      description: |
+        Registra un nuevo artista en el catálogo del festival. Operación restringida a administradores.
+      operationId: createArtist
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateArtistRequest"
+        description: Información requerida para dar de alta al artista.
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artist"
+          description: Artista creado exitosamente.
+        "400":
+          description: Datos del artista incompletos o inválidos.
+        "401":
+          description: No autenticado.
+        "403":
+          description: Acceso denegado. Requiere rol de administrador.
+      security:
+      - BearerAuth: []
+      summary: Crear un nuevo artista
+      tags:
+      - Artistas
+  /artists/{id}:
+    delete:
+      description: |
+        Borra un artista del catálogo. Operación exclusiva para administradores.
+      operationId: deleteArtist
+      parameters:
+      - description: Identificador del artista a eliminar.
+        example: art_12345
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "204":
+          description: Artista eliminado satisfactoriamente.
+        "401":
+          description: No autenticado.
+        "403":
+          description: Acceso denegado.
+        "404":
+          description: El artista no existe.
+      security:
+      - BearerAuth: []
+      summary: Eliminar un artista del catálogo
+      tags:
+      - Artistas
+    get:
+      description: |
+        Devuelve la información de un artista a partir de su identificador. Esta operación es consultada de forma síncrona por el microservicio de Gestión de Eventos.
+      operationId: getArtistById
+      parameters:
+      - description: Identificador único del artista.
+        example: art_12345
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artist"
+          description: Artista encontrado.
+        "404":
+          description: No existe ningún artista con el identificador proporcionado.
+      summary: Obtener el detalle de un artista
+      tags:
+      - Artistas
+    put:
+      description: |
+        Modifica la biografía, género o imagen de un artista. Operación para administradores.
+      operationId: updateArtist
+      parameters:
+      - description: Identificador del artista que se actualizará.
+        example: art_12345
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateArtistRequest"
+        description: Nuevos datos del artista.
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Artist"
+          description: Artista actualizado correctamente.
+        "401":
+          description: No autenticado.
+        "403":
+          description: Acceso denegado.
+        "404":
+          description: El artista indicado no existe.
+      security:
+      - BearerAuth: []
+      summary: Actualizar ficha de un artista
+      tags:
+      - Artistas
+  /artists/{id}/songs:
+    get:
+      description: |
+        Devuelve el repertorio de canciones vinculadas al artista, incluyendo sus identificadores de Spotify.
+      operationId: getSongsByArtist
+      parameters:
+      - description: Identificador del artista cuyas canciones se consultan.
+        example: art_12345
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/Song"
+                type: array
+          description: Lista de canciones del artista.
+        "404":
+          description: El artista especificado no existe.
+      summary: Listar canciones de un artista
+      tags:
+      - Canciones
+    post:
+      description: |
+        Asocia una nueva canción al artista especificado.
+      operationId: addSongToArtist
+      parameters:
+      - description: Identificador del artista al que se añade la canción.
+        example: art_12345
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSongRequest"
+        description: Información de la canción e identificadores externos.
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Song"
+          description: Canción creada y vinculada correctamente.
+        "400":
+          description: Datos de la canción incorrectos.
+        "401":
+          description: No autenticado.
+        "403":
+          description: Acceso denegado.
+        "404":
+          description: El artista especificado no existe.
+      security:
+      - BearerAuth: []
+      summary: Añadir una canción al repertorio de un artista
+      tags:
+      - Canciones
+components:
+  schemas:
+    CreateArtistRequest:
+      example:
+        name: Daft Punk
+        genre: Electrónica
+        biography: Dúo francés de música electrónica formado en 1993...
+        image_url: https://imagenes.subsonic.com/artistas/daftpunk.jpg
+      properties:
+        name:
+          description: Nombre artístico del intérprete o agrupación.
+          example: Daft Punk
+          title: name
+          type: string
+        genre:
+          description: Género musical principal.
+          example: Electrónica
+          title: genre
+          type: string
+        biography:
+          description: Reseña biográfica del artista.
+          example: Dúo francés de música electrónica formado en 1993...
+          title: biography
+          type: string
+        image_url:
+          description: URL oficial de la imagen del artista.
+          example: https://imagenes.subsonic.com/artistas/daftpunk.jpg
+          format: uri
+          title: image_url
+          type: string
+      required:
+      - genre
+      - name
+      title: CreateArtistRequest
+      type: object
+    Artist:
+      example:
+        id: art_12345
+        name: Daft Punk
+        genre: Electrónica
+        biography: Dúo francés de música electrónica formado en 1993...
+        image_url: https://imagenes.subsonic.com/artistas/daftpunk.jpg
+      properties:
+        id:
+          description: Identificador único del artista. Este microservicio es el propietario
+            del dato.
+          example: art_12345
+          title: id
+          type: string
+        name:
+          description: Nombre artístico.
+          example: Daft Punk
+          title: name
+          type: string
+        genre:
+          description: Género musical.
+          example: Electrónica
+          title: genre
+          type: string
+        biography:
+          description: Biografía del artista.
+          example: Dúo francés de música electrónica formado en 1993...
+          title: biography
+          type: string
+        image_url:
+          description: Enlace a la fotografía promocional.
+          example: https://imagenes.subsonic.com/artistas/daftpunk.jpg
+          format: uri
+          title: image_url
+          type: string
+      required:
+      - genre
+      - id
+      - name
+      title: Artist
+      type: object
+    CreateSongRequest:
+      example:
+        title: Get Lucky
+        spotify_id: 2Foc5Q5nqNiosCNqttzNZB
+        spotify_url: https://open.spotify.com/track/2Foc5Q5nqNiosCNqttzNZB
+        preview_url: https://p.scdn.co/mp3-preview/abc1234
+      properties:
+        title:
+          description: Título de la pista musical.
+          example: Get Lucky
+          title: title
+          type: string
+        spotify_id:
+          description: Identificador de la pista en Spotify. El dato pertenece a Spotify
+            API.
+          example: 2Foc5Q5nqNiosCNqttzNZB
+          title: spotify_id
+          type: string
+        spotify_url:
+          description: Enlace de reproducción directo en Spotify.
+          example: https://open.spotify.com/track/2Foc5Q5nqNiosCNqttzNZB
+          format: uri
+          title: spotify_url
+          type: string
+        preview_url:
+          description: URL con fragmento de preescucha musical (30s).
+          example: https://p.scdn.co/mp3-preview/abc1234
+          format: uri
+          title: preview_url
+          type: string
+      required:
+      - title
+      title: CreateSongRequest
+      type: object
+    Song:
+      example:
+        id: song_987
+        artist_id: art_12345
+        title: Get Lucky
+        spotify_id: 2Foc5Q5nqNiosCNqttzNZB
+        spotify_url: https://open.spotify.com/track/2Foc5Q5nqNiosCNqttzNZB
+        preview_url: https://p.scdn.co/mp3-preview/abc1234
+      properties:
+        id:
+          description: Identificador único de la canción en este microservicio.
+          example: song_987
+          title: id
+          type: string
+        artist_id:
+          description: Identificador del artista propietario de la canción. Pertenece
+            a este microservicio.
+          example: art_12345
+          title: artist_id
+          type: string
+        title:
+          description: Título de la canción.
+          example: Get Lucky
+          title: title
+          type: string
+        spotify_id:
+          description: Identificador externo en Spotify.
+          example: 2Foc5Q5nqNiosCNqttzNZB
+          title: spotify_id
+          type: string
+        spotify_url:
+          description: Enlace al reproductor web de Spotify.
+          example: https://open.spotify.com/track/2Foc5Q5nqNiosCNqttzNZB
+          format: uri
+          title: spotify_url
+          type: string
+        preview_url:
+          description: Archivo de audio de preescucha.
+          example: https://p.scdn.co/mp3-preview/abc1234
+          format: uri
+          title: preview_url
+          type: string
+      required:
+      - artist_id
+      - id
+      - title
+      title: Song
+      type: object
+  securitySchemes:
+    BearerAuth:
+      bearerFormat: JWT
+      scheme: bearer
+      type: http
