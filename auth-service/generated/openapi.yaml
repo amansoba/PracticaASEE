@@ -1,0 +1,516 @@
+
+openapi: 3.0.3
+
+info:
+  description: |
+    API responsable de la autenticación, registro, gestión de sesiones,
+    perfiles de usuario y asignación de roles dentro de la plataforma.
+    El microservicio de Autenticación y Cuentas es el propietario de las
+    credenciales, tokens y perfiles de los usuarios. Es invocado por otros
+    microservicios para:
+    - Tienda / Merchandising: verificar la identidad del cliente que realiza
+      pedidos y asociarle la compra.
+    - Gestión de Eventos: validar la identidad del usuario comprador para
+      asociarle las entradas.
+    - Gestión de Proveedores: comprobar permisos y roles (provider o admin)
+      antes de gestionar presupuestos o espacios.
+  title: API de Autenticación y Cuentas - Subsonic Festival
+  version: 1.2.0
+
+servers:
+  - description: Servidor de desarrollo
+    url: https://api.subsonic.com/auth/v1
+
+tags:
+  - description: Operaciones de registro, inicio y cierre de sesión, y emisión de tokens
+    name: Autenticación
+  - description: Gestión de perfiles y asignación de roles de usuario
+    name: Usuarios
+
+paths:
+  /auth/register:
+    post:
+      description: |
+        Crea una nueva cuenta de usuario en el sistema con rol
+        predeterminado de cliente. Esta operación es autónoma y no
+        requiere comunicarse con otros microservicios.
+      operationId: registerUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+        description: Datos necesarios para el registro del usuario.
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+          description: Usuario registrado exitosamente.
+        "400":
+          description: Datos inválidos o el correo ya se encuentra registrado.
+      summary: Registrar un nuevo usuario
+      tags:
+        - Autenticación
+
+  /auth/login:
+    post:
+      description: |
+        Autentica las credenciales del usuario y genera un token JWT
+        firmado que contiene su identificador y rol. No requiere
+        comunicación con otros microservicios.
+      operationId: loginUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+        description: Credenciales de acceso del usuario.
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+          description: Autenticación exitosa. Devuelve el token de acceso.
+        "401":
+          description: Credenciales incorrectas.
+      summary: Iniciar sesión
+      tags:
+        - Autenticación
+
+  /auth/logout:
+    post:
+      description: |
+        Invalida la sesión y el token del usuario actual.
+      operationId: logoutUser
+      responses:
+        "200":
+          description: Sesión cerrada correctamente.
+        "401":
+          description: Token no proporcionado o inválido.
+      security:
+        - BearerAuth: []
+      summary: Cerrar sesión
+      tags:
+        - Autenticación
+
+  /auth/reset-password:
+    post:
+      description: |
+        Inicia el flujo de recuperación de contraseña enviando un
+        enlace al correo electrónico proporcionado.
+      operationId: requestPasswordReset
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/requestPasswordReset_request"
+        description: Dirección de correo del usuario solicitante.
+        required: true
+      responses:
+        "200":
+          description: Correo de recuperación enviado si la cuenta existe.
+      summary: Solicitar cambio de contraseña
+      tags:
+        - Autenticación
+
+  /auth/reset-password/confirm:
+    post:
+      description: |
+        Confirma el restablecimiento de contraseña mediante un token
+        temporal recibido por correo. El token solo puede usarse una
+        vez y caduca a los 15 minutos.
+      operationId: confirmPasswordReset
+      requestBody:
+        required: true
+        description: Token de recuperación y nueva contraseña.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmPasswordResetRequest"
+      responses:
+        "200":
+          description: Contraseña actualizada correctamente.
+        "400":
+          description: Token inválido, caducado o ya utilizado, o contraseña no válida.
+      summary: Confirmar recuperación de contraseña
+      tags:
+        - Autenticación
+
+  /users/me:
+    get:
+      description: |
+        Devuelve la información de perfil asociada al token JWT actual.
+      operationId: getCurrentUserProfile
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+          description: Perfil del usuario devuelto correctamente.
+        "401":
+          description: No autorizado. Token inválido o ausente.
+      security:
+        - BearerAuth: []
+      summary: Obtener el perfil del usuario autenticado
+      tags:
+        - Usuarios
+
+    put:
+      description: |
+        Modifica los datos personales básicos del usuario autenticado.
+      operationId: updateCurrentUserProfile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+        description: Campos de perfil a actualizar.
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+          description: Perfil actualizado correctamente.
+        "400":
+          description: Datos enviados incorrectos.
+        "401":
+          description: No autorizado.
+      security:
+        - BearerAuth: []
+      summary: Actualizar el perfil del usuario autenticado
+      tags:
+        - Usuarios
+
+  /users:
+    get:
+      description: |
+        Operación exclusiva para administradores. Lista todos los
+        usuarios registrados en el sistema.
+      operationId: listAllUsers
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/UserProfile"
+                type: array
+          description: Lista de usuarios del sistema.
+        "401":
+          description: No autenticado.
+        "403":
+          description: Acceso denegado. Se requiere rol de administrador.
+      security:
+        - BearerAuth: []
+      summary: Listar todos los usuarios
+      tags:
+        - Usuarios
+
+  /users/{id}:
+    get:
+      description: |
+        Devuelve el perfil y estado de un usuario por su ID.
+        Endpoint consultado internamente por Tienda, Gestión de Eventos
+        y Proveedores para verificar existencia y permisos.
+      operationId: getUserById
+      parameters:
+        - description: Identificador único del usuario a consultar.
+          example: usr_555
+          explode: false
+          in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+          description: Usuario encontrado.
+        "401":
+          description: No autenticado.
+        "404":
+          description: No existe ningún usuario con el identificador indicado.
+      security:
+        - BearerAuth: []
+      summary: Consultar un usuario por identificador
+      tags:
+        - Usuarios
+
+  /users/{id}/role:
+    put:
+      description: |
+        Operación exclusiva para administradores. Permite conceder
+        privilegios de proveedor o administrador.
+      operationId: updateUserRole
+      parameters:
+        - description: Identificador del usuario cuyo rol será actualizado.
+          example: usr_555
+          explode: false
+          in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/updateUserRole_request"
+        description: Nuevo rol a asignar.
+        required: true
+      responses:
+        "200":
+          description: Rol modificado correctamente.
+        "401":
+          description: No autenticado.
+        "403":
+          description: Acceso denegado. Requiere rol de administrador.
+        "404":
+          description: El usuario indicado no existe.
+      security:
+        - BearerAuth: []
+      summary: Modificar el rol de un usuario
+      tags:
+        - Usuarios
+
+components:
+  schemas:
+    ConfirmPasswordResetRequest:
+      type: object
+      description: Datos necesarios para confirmar la recuperación de contraseña.
+      required:
+        - token
+        - new_password
+      properties:
+        token:
+          type: string
+          minLength: 1
+          description: Token de recuperación recibido por correo.
+        new_password:
+          type: string
+          format: password
+          minLength: 8
+          description: Nueva contraseña del usuario.
+
+    RegisterRequest:
+      example:
+        email: usuario@email.com
+        password: "123456"
+        name: Juan Pérez
+        phone: "+34600112233"
+      properties:
+        email:
+          description: Correo electrónico único del usuario.
+          example: usuario@email.com
+          format: email
+          title: email
+          type: string
+        password:
+          description: Contraseña de acceso en texto plano para ser cifrada en el microservicio.
+          example: "123456"
+          format: password
+          title: password
+          type: string
+        name:
+          description: Nombre completo del usuario.
+          example: Juan Pérez
+          title: name
+          type: string
+        phone:
+          description: Número telefónico de contacto del usuario.
+          example: "+34600112233"
+          title: phone
+          type: string
+      required:
+        - email
+        - name
+        - password
+      title: RegisterRequest
+      type: object
+
+    LoginRequest:
+      example:
+        email: usuario@email.com
+        password: "123456"
+      properties:
+        email:
+          description: Correo electrónico registrado.
+          example: usuario@email.com
+          format: email
+          title: email
+          type: string
+        password:
+          description: Contraseña de la cuenta.
+          example: "123456"
+          format: password
+          title: password
+          type: string
+      required:
+        - email
+        - password
+      title: LoginRequest
+      type: object
+
+    AuthResponse:
+      example:
+        access_token: eyJhbGciOiJIUzI1NiIsInR5c...
+        token_type: Bearer
+        expires_in: 3600
+        user:
+          id: usr_555
+          name: Juan Pérez
+          email: usuario@email.com
+          phone: "+34600112233"
+          avatar_url: https://imagenes.subsonic.com/avatars/usr_555.jpg
+          role: client
+      properties:
+        access_token:
+          description: Token JWT generado para autenticar peticiones en el resto de la plataforma.
+          example: eyJhbGciOiJIUzI1NiIsInR5c...
+          title: access_token
+          type: string
+        token_type:
+          description: Esquema de autorización HTTP.
+          example: Bearer
+          title: token_type
+          type: string
+        expires_in:
+          description: Tiempo de vigencia del token expresado en segundos.
+          example: 3600
+          title: expires_in
+          type: integer
+        user:
+          $ref: "#/components/schemas/UserProfile"
+      required:
+        - access_token
+        - expires_in
+        - token_type
+        - user
+      title: AuthResponse
+      type: object
+
+    UpdateProfileRequest:
+      example:
+        name: Juan Pérez
+        phone: "+34600112233"
+        avatar_url: https://imagenes.subsonic.com/avatars/usr_555.jpg
+      properties:
+        name:
+          description: Nombre completo del usuario.
+          example: Juan Pérez
+          title: name
+          type: string
+        phone:
+          description: Número de contacto del usuario.
+          example: "+34600112233"
+          title: phone
+          type: string
+        avatar_url:
+          description: URL del avatar del perfil.
+          example: https://imagenes.subsonic.com/avatars/usr_555.jpg
+          format: uri
+          title: avatar_url
+          type: string
+      title: UpdateProfileRequest
+      type: object
+
+    UserProfile:
+      example:
+        id: usr_555
+        name: Juan Pérez
+        email: usuario@email.com
+        phone: "+34600112233"
+        avatar_url: https://imagenes.subsonic.com/avatars/usr_555.jpg
+        role: client
+      properties:
+        id:
+          description: Identificador único del usuario. Este microservicio es el propietario del dato.
+          example: usr_555
+          title: id
+          type: string
+        name:
+          description: Nombre del usuario.
+          example: Juan Pérez
+          title: name
+          type: string
+        email:
+          description: Correo electrónico del usuario.
+          example: usuario@email.com
+          format: email
+          title: email
+          type: string
+        phone:
+          description: Teléfono del usuario.
+          example: "+34600112233"
+          title: phone
+          type: string
+        avatar_url:
+          description: Dirección URL de la imagen de perfil del usuario.
+          example: https://imagenes.subsonic.com/avatars/usr_555.jpg
+          format: uri
+          title: avatar_url
+          type: string
+        role:
+          description: Rol asignado en la plataforma.
+          enum:
+            - client
+            - provider
+            - admin
+          example: client
+          title: role
+          type: string
+      required:
+        - email
+        - id
+        - name
+        - role
+      title: UserProfile
+      type: object
+
+    requestPasswordReset_request:
+      properties:
+        email:
+          description: Correo electrónico de la cuenta a recuperar.
+          example: usuario@email.com
+          format: email
+          title: email
+          type: string
+      required:
+        - email
+      title: requestPasswordReset_request
+      type: object
+
+    updateUserRole_request:
+      properties:
+        role:
+          description: Rol de acceso en el sistema.
+          enum:
+            - client
+            - provider
+            - admin
+          example: provider
+          title: role
+          type: string
+      required:
+        - role
+      title: updateUserRole_request
+      type: object
+
+  securitySchemes:
+    BearerAuth:
+      bearerFormat: JWT
+      scheme: bearer
+      type: http
