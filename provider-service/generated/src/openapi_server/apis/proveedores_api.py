@@ -121,6 +121,31 @@ async def create_provider(
         create_provider_request
     )
 
+    
+# ============================================================
+# GET /providers/me
+# ============================================================
+
+@router.get(
+    "/providers/me",
+    tags=["Proveedores"],
+    summary="Consultar mi empresa proveedora",
+    response_model=ProviderProfile,
+    responses={
+        401: {"description": "No autenticado"},
+        403: {"description": "Se requiere rol de proveedor"},
+        404: {"description": "El usuario no tiene una empresa registrada"},
+        503: {"description": "Autenticacion no disponible"}
+    }
+)
+async def get_my_provider(
+    usuario_actual: dict = Depends(obtener_usuario_proveedor)
+) -> ProviderProfile:
+
+    return await obtener_implementacion().get_my_provider(
+        usuario_actual["id"]
+    )
+
 
 # ============================================================
 # GET /providers/{id}

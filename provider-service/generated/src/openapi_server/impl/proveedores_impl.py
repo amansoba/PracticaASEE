@@ -62,6 +62,28 @@ def validar_proveedor(solicitud: CreateProviderRequest) -> dict:
 # ============================================================
 
 class ProveedoresApiImpl(BaseProveedoresApi):
+    
+    # GET /providers/me
+    async def get_my_provider(
+        self,
+        user_id: str
+    ) -> ProviderProfile:
+
+        with SessionLocal() as db:
+            proveedor = db.scalar(
+                select(ProviderDB).where(
+                    ProviderDB.user_id == user_id
+                )
+            )
+
+            if proveedor is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="El usuario no tiene una empresa registrada"
+                )
+
+            return convertir_proveedor(proveedor)
+
 
     # GET /providers
     async def get_providers(self) -> list[ProviderProfile]:

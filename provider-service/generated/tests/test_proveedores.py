@@ -327,3 +327,77 @@ def test_error_al_consultar_autenticacion(
     )
 
     assert respuesta.status_code == 503
+
+
+# ============================================================
+# TEST 10 - CONSULTAR MI EMPRESA
+# ============================================================
+
+def test_consultar_mi_empresa(client, autenticar):
+
+    autenticar(PROVEEDOR)
+
+    headers = {
+        "Authorization": "Bearer token_de_prueba"
+    }
+
+    registro = client.post(
+        "/providers",
+        json=datos_empresa(),
+        headers=headers
+    )
+
+    assert registro.status_code == 201, registro.text
+
+    proveedor_id = registro.json()["id"]
+
+    respuesta = client.get(
+        "/providers/me",
+        headers=headers
+    )
+
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json()["id"] == proveedor_id
+    assert respuesta.json()["user_id"] == PROVEEDOR["id"]
+
+
+# ============================================================
+# TEST 11 - CLIENTE NO PUEDE CONSULTAR MI EMPRESA
+# ============================================================
+
+def test_cliente_no_puede_consultar_mi_empresa(
+    client,
+    autenticar
+):
+
+    autenticar(CLIENTE)
+
+    respuesta = client.get(
+        "/providers/me",
+        headers={
+            "Authorization": "Bearer token_de_prueba"
+        }
+    )
+
+    assert respuesta.status_code == 403
+
+
+# ============================================================
+# TEST 12 - PROVEEDOR SIN EMPRESA REGISTRADA
+# ============================================================
+
+def test_consultar_mi_empresa_inexistente(
+    client,
+    autenticar
+):
+
+    autenticar(PROVEEDOR)
+
+    respuesta = client.get(
+        "/providers/me",
+        headers={
+            "Authorization": "Bearer token_de_prueba"
+        }
+    )
+
+    assert respuesta.status_code == 404

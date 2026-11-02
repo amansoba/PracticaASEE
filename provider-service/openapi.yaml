@@ -91,6 +91,36 @@ paths:
           description: >
             No se pudo validar el usuario porque el microservicio de Autenticación no está disponible.
 
+  /providers/me:
+    get:
+      tags:
+        - Proveedores
+      summary: Consultar mi empresa proveedora
+      description: >
+        Devuelve la empresa asociada al usuario autenticado.
+        Solo pueden acceder usuarios con rol provider.
+      operationId: getMyProvider
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Empresa del proveedor autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderProfile'
+        '401':
+          description: No autenticado.
+        '403':
+          description: Se requiere rol de proveedor.
+        '404':
+          description: El usuario no tiene una empresa registrada.
+        '503':
+          description: Autenticacion no disponible.
+
+
+
+
   /providers/{id}:
     get:
       tags:
