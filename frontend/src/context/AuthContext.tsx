@@ -1,20 +1,7 @@
 
-import {
-  createContext,
-  useContext,
-  useState,
-  type ReactNode,
-} from "react";
+import { useState, type ReactNode } from "react";
 import type { Usuario } from "../services/auth";
-
-interface AuthContextType {
-  usuario: Usuario | null;
-  token: string | null;
-  guardarSesion: (usuario: Usuario, token: string) => void;
-  cerrarSesion: () => void;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import { AuthContext } from "./AuthContextBase";
 
 function obtenerUsuarioGuardado(): Usuario | null {
   try {
@@ -60,14 +47,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const contexto = useContext(AuthContext);
-
-  if (!contexto) {
-    throw new Error("useAuth debe utilizarse dentro de AuthProvider");
-  }
-
-  return contexto;
 }

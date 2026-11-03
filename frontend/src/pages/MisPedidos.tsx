@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import { obtenerPedidosUsuario, type Pedido } from "../services/tienda";
 
 function MisPedidos() {
@@ -10,9 +10,8 @@ function MisPedidos() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
+    useEffect(() => {
     if (!usuario || !token) {
-      setCargando(false);
       return;
     }
 

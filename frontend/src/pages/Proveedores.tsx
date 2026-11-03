@@ -1,7 +1,8 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
+import type { Usuario } from "../services/auth";
 import {
   obtenerProveedores,
   obtenerMiEmpresa,
@@ -11,38 +12,25 @@ import {
   type PropuestaProveedor,
 } from "../services/proveedores";
 
-function Proveedores() {
-  const { usuario, token } = useAuth();
+interface PanelProveedoresProps {
+  usuario: Usuario;
+  token: string;
+}
 
+function PanelProveedores({
+  usuario,
+  token,
+}: PanelProveedoresProps) {
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [miEmpresa, setMiEmpresa] = useState<MiEmpresaProveedor | null>(null);
   const [propuestas, setPropuestas] = useState<PropuestaProveedor[]>([]);
-  const [cargando, setCargando] = useState(false);
+  const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let activo = true;
 
-    setError("");
-    setProveedores([]);
-    setMiEmpresa(null);
-    setPropuestas([]);
-
-    if (!usuario || !token) {
-      return;
-    }
-
-    if (usuario.role !== "admin" && usuario.role !== "provider") {
-      return;
-    }
-
-    setCargando(true);
-
     async function cargarDatos() {
-      if (!token || !usuario) {
-        return;
-      }
-
       try {
         if (usuario.role === "admin") {
           const datos = await obtenerProveedores(token);
@@ -50,9 +38,7 @@ function Proveedores() {
           if (activo) {
             setProveedores(datos);
           }
-        }
-
-        if (usuario.role === "provider") {
+        } else if (usuario.role === "provider") {
           const empresa = await obtenerMiEmpresa(token);
 
           if (!activo) {
@@ -91,29 +77,6 @@ function Proveedores() {
       activo = false;
     };
   }, [usuario, token]);
-
-  if (!usuario || !token) {
-    return (
-      <main className="pagina-eventos">
-        <h1>Proveedores</h1>
-        <p>Inicia sesión para acceder a esta sección.</p>
-        <Link to="/login" className="navbar-login">
-          Iniciar sesión
-        </Link>
-      </main>
-    );
-  }
-
-  if (usuario.role === "client") {
-    return (
-      <main className="pagina-eventos">
-        <h1>Proveedores</h1>
-        <p>
-          Esta sección está reservada a proveedores y administradores.
-        </p>
-      </main>
-    );
-  }
 
   if (usuario.role === "provider") {
     return (
@@ -181,16 +144,19 @@ function Proveedores() {
 
                     <h2>Propuesta de presupuesto</h2>
 
-                    <p>
-                      Evento: {propuesta.event_id}
-                    </p>
+                    <p>Evento: {propuesta.event_id}</p>
 
                     <p>
                       Presupuesto:{" "}
-                      {typeof propuesta.budget_proposal === "number"
-                        ? `${propuesta.budget_proposal.toFixed(2)} €`
-                        : "No especificado"}
+                      {propuesta.budget_proposal.toFixed(2)} €
                     </p>
+
+                    {propuesta.setup_date && (
+                      <p>
+                        Fecha de montaje:{" "}
+                        {propuesta.setup_date}
+                      </p>
+                    )}
 
                     <p className="pedido-identificador">
                       ID: {propuesta.id}
@@ -234,7 +200,8 @@ function Proveedores() {
               <p>CIF/NIF: {proveedor.cif_nif}</p>
 
               <p>
-                Contacto: {proveedor.contact_email || "No especificado"}
+                Contacto:{" "}
+                {proveedor.contact_email || "No especificado"}
               </p>
 
               <p className="pedido-identificador">
@@ -245,6 +212,42 @@ function Proveedores() {
         ))}
       </div>
     </main>
+  );
+}
+
+function Proveedores() {
+  const { usuario, token } = useAuth();
+
+  if (!usuario || !token) {
+    return (
+      <main className="pagina-eventos">
+        <h1>Proveedores</h1>
+        <p>Inicia sesión para acceder a esta sección.</p>
+
+        <Link to="/login" className="navbar-login">
+          Iniciar sesión
+        </Link>
+      </main>
+    );
+  }
+
+  if (usuario.role === "client") {
+    return (
+      <main className="pagina-eventos">
+        <h1>Proveedores</h1>
+        <p>
+          Esta sección está reservada a proveedores y administradores.
+        </p>
+      </main>
+    );
+  }
+
+  return (
+    <PanelProveedores
+      key={`${usuario.id}-${token}`}
+      usuario={usuario}
+      token={token}
+    />
   );
 }
 

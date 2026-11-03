@@ -6,7 +6,7 @@ import {
   crearPedido,
   type Producto,
 } from "../services/tienda";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 function Tienda() {
   const navigate = useNavigate();
