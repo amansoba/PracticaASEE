@@ -163,6 +163,7 @@ async def get_order_by_id(
         401: {"description": "No autenticado"},
         403: {"description": "Se requiere administrador"},
         404: {"description": "Pedido no encontrado"},
+        409: {"description": "Transicion de estado no permitida"},
         503: {"description": "Autenticacion no disponible"}
     }
 )
@@ -175,5 +176,46 @@ async def update_order_status(
     return await obtener_implementacion().update_order_status(
         id,
         update_order_status_request,
+        usuario_actual
+    )
+
+
+# ============================================================
+# POST /orders/{id}/cancel
+# ============================================================
+
+@router.post(
+    "/orders/{id}/cancel",
+    tags=["Pedidos"],
+    summary="Cancelar un pedido propio pendiente",
+    status_code=200,
+    responses={
+        200: {
+            "description": "Pedido cancelado correctamente"
+        },
+        401: {
+            "description": "No autenticado"
+        },
+        403: {
+            "description": "El pedido pertenece a otro usuario"
+        },
+        404: {
+            "description": "Pedido no encontrado"
+        },
+        409: {
+            "description": "El pedido ya no puede cancelarse"
+        },
+        503: {
+            "description": "Autenticacion no disponible"
+        }
+    }
+)
+async def cancel_order(
+    id: str = Path(...),
+    usuario_actual: dict = Depends(obtener_usuario_actual)
+) -> None:
+
+    return await obtener_implementacion().cancel_order(
+        id,
         usuario_actual
     )

@@ -480,3 +480,73 @@ class PedidosApiImpl(BasePedidosApi):
             except Exception:
                 db.rollback()
                 raise
+
+    # POST /orders/{id}/cancel
+    async def cancel_order(
+        self,
+        id: str,
+        usuario_actual: dict
+    ) -> None:
+        """
+        Permite al propietario cancelar su pedido
+        mientras permanezca pendiente.
+
+        La cancelacion y la reposicion del stock
+        se realizan en una unica transaccion.
+        """
+
+        with SessionLocal() as db:
+            try:
+                # Bloquear el pedido para impedir que dos
+                # cancelaciones devuelvan el stock dos veces.
+                pedido = db.scalar(
+                    select(OrderDB)
+                    .where(OrderDB.id == id)
+                    .with_for_update()
+                )
+
+                if pedido is None:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="Pedido no encontrado"
+                    )
+
+                # Comprobar la identidad antes de consultar
+                # o modificar el estado del pedido.
+                comprobar_usuario(
+                    usuario_actual,
+                    pedido.user_id
+                )
+
+                # Una cancelacion repetida no debe
+                # reponer el inventario nuevamente.
+                if pedido.status == "cancelled":
+                    return None
+
+                # Solo los pedidos pendientes se pueden
+                # cancelar desde la cuenta del cliente.
+                if pedido.status != "pending":
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "Solo se pueden cancelar "
+                            "pedidos pendientes"
+                        )
+                    )
+
+                # Cargar los articulos y reponer stock
+                # reutilizando la funcion ya existente.
+                _ = pedido.items
+                devolver_stock(db, pedido)
+
+                # Actualizar el pedido dentro de la
+                # misma transaccion de inventario.
+                pedido.status = "cancelled"
+
+                db.commit()
+
+                return None
+
+            except Exception:
+                db.rollback()
+                raise
