@@ -224,6 +224,31 @@ paths:
             No se pudo validar al usuario porque el microservicio de Autenticación y Cuentas
             no está disponible.
 
+    get:
+      tags:
+        - Pedidos
+      summary: Consultar todos los pedidos
+      description: >
+        Devuelve todos los pedidos registrados.
+        Operacion exclusiva para administradores.
+      operationId: listAllOrders
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Listado global de pedidos.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401':
+          description: No autenticado.
+        '403':
+          description: Se requiere administrador.
+        '503':
+          description: Autenticacion no disponible.
   /orders/user/{userId}:
     get:
       tags:

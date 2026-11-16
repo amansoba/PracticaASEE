@@ -217,6 +217,31 @@ paths:
       summary: Crear un nuevo pedido (Checkout)
       tags:
       - Pedidos
+    get:
+      tags:
+        - Pedidos
+      summary: Consultar todos los pedidos
+      description: >
+        Devuelve todos los pedidos registrados.
+        Operacion exclusiva para administradores.
+      operationId: listAllOrders
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Listado global de pedidos.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401':
+          description: No autenticado.
+        '403':
+          description: Se requiere administrador.
+        '503':
+          description: Autenticacion no disponible.
   /orders/user/{userId}:
     get:
       description: |

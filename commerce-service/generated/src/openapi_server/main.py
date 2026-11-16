@@ -1,21 +1,10 @@
 
 # coding: utf-8
 
-"""
-    API de Tienda y Merchandising - Subsonic Festival
-
-    API responsable de la gestion de la tienda oficial,
-    productos fisicos, control de stock e inventario por
-    tallas y procesamiento de pedidos.
-
-    Se comunica de forma sincronica con Autenticacion
-    y Cuentas para validar los usuarios compradores.
-"""
-
 import asyncio
 import logging
-from contextlib import asynccontextmanager
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from openapi_server.apis.pedidos_api import (
@@ -24,39 +13,28 @@ from openapi_server.apis.pedidos_api import (
 from openapi_server.apis.productos_api import (
     router as ProductosApiRouter
 )
+from openapi_server.apis.administracion_pedidos_api import (
+    router as AdministracionPedidosApiRouter
+)
 from openapi_server.impl.pedidos_impl import (
     expirar_pedidos_pendientes
 )
 
 
-# ============================================================
-# CONFIGURACION DE EXPIRACION AUTOMATICA
-# ============================================================
-
 logger = logging.getLogger(__name__)
 
-# Revisar los pedidos pendientes cada 60 segundos.
 INTERVALO_REVISION_SEGUNDOS = 60
 
 
 # ============================================================
-# TAREA PERIODICA DE EXPIRACION
+# EXPIRACION AUTOMATICA DE PEDIDOS
 # ============================================================
 
 async def revisar_pedidos_periodicamente():
-    """
-    Ejecuta la expiracion de pedidos pendientes
-    mientras el microservicio permanezca activo.
-
-    Los errores se registran y no impiden que
-    se realicen las siguientes comprobaciones.
-    """
 
     while True:
 
         try:
-            # Ejecutar las operaciones de base de datos
-            # en un hilo para no bloquear FastAPI.
             expirados = await asyncio.to_thread(
                 expirar_pedidos_pendientes
             )
@@ -72,22 +50,17 @@ async def revisar_pedidos_periodicamente():
                 "Error al revisar pedidos pendientes"
             )
 
-        # Esperar antes de la siguiente comprobacion.
         await asyncio.sleep(
             INTERVALO_REVISION_SEGUNDOS
         )
 
 
 # ============================================================
-# CICLO DE VIDA DE FASTAPI
+# CICLO DE VIDA
 # ============================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Iniciar la tarea de expiracion cuando arranca
-    FastAPI y detenerla cuando se cierra.
-    """
 
     tarea_expiracion = asyncio.create_task(
         revisar_pedidos_periodicamente()
@@ -106,27 +79,21 @@ async def lifespan(app: FastAPI):
 
 
 # ============================================================
-# APLICACION FASTAPI
+# APLICACION
 # ============================================================
 
 app = FastAPI(
     title="API de Tienda y Merchandising - Subsonic Festival",
     description=(
-        "API responsable de la gestion de la tienda "
-        "oficial, productos fisicos, control de stock "
-        "e inventario por tallas y procesamiento de "
-        "pedidos. Para realizar sus operaciones se "
-        "comunica de forma sincronica con el "
-        "microservicio de Autenticacion y Cuentas."
+        "API responsable de productos, inventario, "
+        "pedidos, pagos simulados, cancelaciones "
+        "y administracion de compras."
     ),
     version="1.1.0",
     lifespan=lifespan
 )
 
 
-# ============================================================
-# REGISTRO DE ROUTERS
-# ============================================================
-
 app.include_router(PedidosApiRouter)
 app.include_router(ProductosApiRouter)
+app.include_router(AdministracionPedidosApiRouter)
