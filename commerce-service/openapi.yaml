@@ -182,6 +182,17 @@ paths:
 
         Esto valida que el usuario existe y está autorizado a operar.
       operationId: createOrder
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: >
+            Identifica reintentos de una misma compra.
+            La misma clave y compra devuelve el pedido original.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
       security:
         - BearerAuth: []
       requestBody:
@@ -318,6 +329,80 @@ paths:
           description: Acceso denegado. Requiere rol de administrador.
         '404':
           description: El pedido indicado no existe.
+
+  /orders/{id}/cancel:
+    post:
+      tags:
+        - Pedidos
+      summary: Cancelar un pedido propio pendiente
+      operationId: cancelOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Pedido cancelado correctamente.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Pedido de otro usuario.
+        '404':
+          description: Pedido no encontrado.
+        '409':
+          description: Pedido no cancelable.
+        '503':
+          description: Autenticacion no disponible.
+
+  /orders/{id}/pay:
+    post:
+      tags:
+        - Pedidos
+      summary: Simular el pago de un pedido
+      description: >
+        Pago simulado de desarrollo.
+        No realiza ningun cargo bancario real.
+      operationId: payOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - payment_token
+              properties:
+                payment_token:
+                  type: string
+      responses:
+        '200':
+          description: Pago simulado correctamente.
+        '400':
+          description: Token de pago rechazado.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Pedido de otro usuario.
+        '404':
+          description: Pedido no encontrado.
+        '409':
+          description: Pedido no pagable.
+        '422':
+          description: Datos incompletos.
+        '503':
+          description: Autenticacion no disponible.
 
 components:
   securitySchemes:
