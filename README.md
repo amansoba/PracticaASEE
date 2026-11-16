@@ -1,506 +1,197 @@
-
 # Subsonic Festival
 
-Plataforma web para la gestión de festivales musicales, desarrollada como proyecto de la asignatura Arquitecturas y Servicios de Entornos Empresariales (ASEE).
+Proyecto de ASEE: cinco API FastAPI con PostgreSQL independiente y un frontend
+React + TypeScript. Los comandos siguientes parten de esta carpeta `PracticaASEE`,
+que contiene el repositorio Git del proyecto y `docker-compose.yml`.
 
-El sistema utiliza una arquitectura de microservicios con un backend desarrollado en Python y FastAPI, bases de datos PostgreSQL independientes y un frontend desarrollado con React y TypeScript.
+## Arranque reproducible con Docker
 
-## 1. Descripción del proyecto
+Requisitos: Git, Docker con Compose y daemon Linux disponible. La construcción
+necesita acceso a los registros de imágenes, PyPI y npm. No hace falta instalar
+Python, Node ni PostgreSQL en el host para arrancar el sistema.
 
-Subsonic Festival permite consultar información sobre festivales y artistas, gestionar usuarios con distintos roles, comprar merchandising y administrar empresas proveedoras y propuestas de presupuesto.
-
-El sistema está dividido en cinco microservicios independientes y una aplicación frontend.
-
-Las comunicaciones se realizan mediante APIs REST y peticiones HTTP. Los servicios utilizan contratos OpenAPI y disponen de documentación interactiva mediante Swagger UI.
-
-## 2. Arquitectura del sistema
-
-El proyecto contiene los siguientes componentes:
-
-| Componente | Puerto | Responsabilidad |
-|---|---|---|
-| Autenticación | 8001 | Registro, login, JWT, usuarios y roles |
-| Gestión de Eventos | 8002 | Festivales, eventos, programación y entradas |
-| Catálogo Musical | 8003 | Artistas, canciones e información musical |
-| Comercio | 8004 | Productos, variantes, existencias y pedidos |
-| Proveedores | 8005 | Empresas, servicios, espacios y presupuestos |
-| Frontend React | 5173 | Interfaz web para los usuarios |
-
-Cada microservicio dispone de su propia base de datos PostgreSQL y se ejecuta de manera independiente.
-
-El frontend se comunica con ellos mediante un proxy configurado en Vite.
-
-### Estructura del repositorio
-
-```text
-PracticaASEE/
-├── auth-service/
-├── catalog-service/
-├── event-service/
-├── commerce-service/
-├── provider-service/
-├── frontend/
-├── docs/
-├── README.md
-├── PosiblesTecnologías.md
-└── .gitignore
-```
-
-Cada microservicio contiene su contrato `openapi.yaml` y una carpeta `generated` con el servidor FastAPI, la lógica de negocio, los modelos y las pruebas.
-
-## 3. Tecnologías utilizadas
-
-### Backend
-
-- Python 3.14
-- FastAPI
-- Uvicorn
-- PostgreSQL
-- SQLAlchemy
-- psycopg
-- Pydantic
-- JWT para autenticación
-- httpx para comunicación entre microservicios
-- pytest para pruebas automatizadas
-- OpenAPI y OpenAPI Generator
-
-### Frontend
-
-- React
-- TypeScript
-- Vite
-- React Router
-- CSS
-- Fetch API
-- ESLint
-
-### Herramientas de desarrollo
-
-- Visual Studio Code
-- Git y GitHub
-- PowerShell en Windows
-- Swagger UI
-
-La integración se ha probado en Windows, utilizando PostgreSQL 15 y Python 3.14.
-
-## 4. Requisitos previos
-
-Para ejecutar el proyecto localmente se necesita:
-
-- Python compatible con las dependencias del backend.
-- Node.js y npm.
-- PostgreSQL.
-- Git.
-- Un editor como Visual Studio Code.
-
-Los seis componentes se ejecutan localmente en puertos diferentes.
-
-Es necesario disponer de las bases de datos y de los archivos de configuración correspondientes.
-
-## 5. Obtener el proyecto
-
-El código integrado se encuentra en la rama `main`.
-
-Para clonar el repositorio:
+Windows (PowerShell):
 
 ```powershell
-git clone https://github.com/amansoba/PracticaASEE.git
-cd PracticaASEE
+Copy-Item .env.example .env
+# Ajustar los valores del archivo .env.
+docker compose up --build
 ```
 
-Para actualizar una copia existente:
+Linux:
 
-```powershell
-git switch main
-git pull origin main
+```bash
+cp .env.example .env
+# Ajustar los valores del archivo .env.
+docker compose up --build
 ```
 
-Antes de realizar cambios, es recomendable comprobar el estado del repositorio:
+Para esperar al estado saludable en segundo plano:
+`docker compose up --build -d --wait --wait-timeout 180`.
+Compose crea las cinco bases, ejecuta los cinco seeds y arranca las API y el
+frontend. Las tablas también se inicializan al arrancar cada API. Los volúmenes
+persisten al ejecutar `docker compose down`; no es necesario borrar datos para
+reconstruir las imágenes.
 
-```powershell
-git status -sb
-```
+| Componente | Acceso local | Responsabilidad | Operaciones de negocio |
+|---|---|---|---:|
+| auth-service | http://localhost:8001/docs | Cuentas, JWT, roles y recuperación de contraseña | 10 |
+| event-service | http://localhost:8002/docs | Festivales, line-up, pases y entradas de desarrollo | 11 |
+| catalog-service | http://localhost:8003/docs | Artistas, canciones y consulta opcional a Spotify | 7 |
+| commerce-service | http://localhost:8004/docs | Productos, tallas, stock y pedidos | 9 |
+| provider-service | http://localhost:8005/docs | Empresas, servicios, espacios y propuestas | 12 |
+| Frontend | http://localhost:5173 | Interfaz React servida por Nginx | — |
 
-En el trabajo en equipo se deben coordinar los cambios antes de modificar archivos compartidos.
+Hay **49 operaciones de negocio**, más `GET /health` y `GET /ready` por servicio:
+**59 operaciones** en total, contrastadas con FastAPI. Swagger y su documento
+`/openapi.json` no se cuentan como operaciones de negocio. La
+[matriz de endpoints](docs/endpoints.md) detalla métodos y rutas.
 
-## 6. Configuración de PostgreSQL
+## Configuración y cuentas de demostración
 
-Cada microservicio utiliza una base de datos independiente.
+Para Docker se utiliza el `.env` de esta raíz. Para ejecución local, cada API
+lee `<servicio>/generated/.env`; las variables del proceso tienen prioridad.
+Los valores de ejemplo son exclusivamente de demostración y no deben usarse
+como credenciales reales. Los archivos `.env` y `.env.test` están ignorados.
 
-| Microservicio | Base de datos | Usuario |
-|---|---|---|
-| Autenticación | subsonic_auth | auth_user |
-| Eventos | subsonic_events | event_user |
-| Catálogo Musical | subsonic_catalog | catalog_user |
-| Comercio | subsonic_commerce | commerce_user |
-| Proveedores | subsonic_providers | provider_user |
-
-Las bases de datos y los usuarios deben crearse en PostgreSQL y disponer de los permisos correspondientes.
-
-También se utilizan bases de datos independientes para las pruebas automatizadas:
-
-| Microservicio | Base de datos de pruebas |
+| Variable | Uso |
 |---|---|
-| Autenticación | subsonic_auth_test |
-| Eventos | subsonic_events_test |
-| Catálogo Musical | subsonic_catalog_test |
-| Comercio | subsonic_commerce_test |
-| Proveedores | subsonic_providers_test |
-
-Las pruebas pueden eliminar y recrear tablas en las bases de datos terminadas en `_test`.
-
-No deben ejecutarse sobre las bases de datos utilizadas para el funcionamiento normal del sistema.
-
-## 7. Variables de entorno
-
-Cada microservicio utiliza un archivo `.env` dentro de su carpeta `generated`.
-
-Los archivos `.env.example` del repositorio sirven como referencia para preparar la configuración local.
-
-### Configuración de PostgreSQL
-
-Ejemplo:
-
-```dotenv
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=NOMBRE_BASE_DATOS
-DB_USER=USUARIO_POSTGRESQL
-DB_PASSWORD=CONTRASENA_LOCAL
-```
-
-Los valores deben adaptarse a la base de datos de cada microservicio.
-
-### Autenticación
-
-El servicio de Autenticación necesita también:
-
-```dotenv
-JWT_SECRET_KEY=CLAVE_SECRETA_DE_AL_MENOS_32_CARACTERES
-JWT_ALGORITHM=HS256
-JWT_EXPIRE_MINUTES=60
-```
-
-La clave JWT debe generarse de forma segura y mantenerse privada.
-
-### Comunicación con Autenticación
-
-Los microservicios que consultan la identidad de los usuarios utilizan:
-
-```dotenv
-AUTH_SERVICE_URL=http://127.0.0.1:8001
-```
-
-### Comunicación con Eventos
-
-Proveedores también utiliza la dirección del microservicio de Eventos:
-
-```dotenv
-EVENT_SERVICE_URL=http://127.0.0.1:8002
-```
-
-### Configuración de las pruebas
-
-Cada servicio utiliza un archivo `.env.test` con las credenciales de su base de datos de pruebas.
-
-Los archivos `.env` y `.env.test` están excluidos del control de versiones.
-
-Nunca deben subirse contraseñas reales, secretos JWT ni credenciales privadas al repositorio.
-
-## 8. Instalación del backend
-
-Los microservicios tienen entornos virtuales independientes.
-
-Por ejemplo, para preparar Autenticación desde la raíz del proyecto:
-
-```powershell
-cd .\auth-service\generated
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements-dev.txt
-```
-
-El mismo procedimiento se realiza en las carpetas:
-
-- `event-service/generated`
-- `catalog-service/generated`
-- `commerce-service/generated`
-- `provider-service/generated`
-
-`requirements.txt` contiene las dependencias de ejecución y `requirements-dev.txt` incorpora las necesarias para desarrollo y pruebas.
-
-Los entornos virtuales no se almacenan en GitHub.
-
-## 9. Arranque de los microservicios
-
-Antes de arrancar los servicios debe estar iniciado PostgreSQL.
-
-Cada microservicio necesita una terminal independiente.
-
-Los siguientes comandos parten de la raíz `PracticaASEE`.
-
-### Terminal 1 - Autenticación
-
-```powershell
-cd .\auth-service\generated
-.\.venv\Scripts\python.exe -m uvicorn openapi_server.main:app --app-dir src --host 127.0.0.1 --port 8001
-```
-
-### Terminal 2 - Eventos
-
-```powershell
-cd .\event-service\generated
-.\.venv\Scripts\python.exe -m uvicorn openapi_server.main:app --app-dir src --host 127.0.0.1 --port 8002
-```
-
-### Terminal 3 - Catálogo Musical
-
-```powershell
-cd .\catalog-service\generated
-.\.venv\Scripts\python.exe -m uvicorn openapi_server.main:app --app-dir src --host 127.0.0.1 --port 8003
-```
-
-### Terminal 4 - Comercio
-
-```powershell
-cd .\commerce-service\generated
-.\.venv\Scripts\python.exe -m uvicorn openapi_server.main:app --app-dir src --host 127.0.0.1 --port 8004
-```
-
-### Terminal 5 - Proveedores
-
-```powershell
-cd .\provider-service\generated
-.\.venv\Scripts\python.exe -m uvicorn openapi_server.main:app --app-dir src --host 127.0.0.1 --port 8005
-```
-
-Se recomienda arrancar primero Autenticación y Eventos, ya que otros servicios pueden necesitar comunicarse con ellos.
-
-Para detener cada servidor puede utilizarse `Ctrl + C` en su terminal.
-
-## 10. Instalación y ejecución del frontend
-
-El frontend utiliza React, TypeScript y Vite.
-
-Desde la raíz del repositorio:
-
-```powershell
-cd frontend
-npm install
-```
-
-Para iniciar el servidor de desarrollo:
-
-```powershell
-npm run dev
-```
-
-La aplicación estará disponible en:
-
-http://localhost:5173
-
-Para utilizar las funcionalidades integradas, los microservicios y PostgreSQL deben estar funcionando.
-
-### Comprobaciones de calidad
-
-Desde la carpeta `frontend`:
-
-```powershell
-npm run lint
-```
-
-Este comando comprueba el código mediante ESLint.
-
-Para verificar TypeScript y generar la versión de producción:
-
-```powershell
-npm run build
-```
-
-La compilación genera una carpeta `dist`, que está excluida del repositorio.
-
-## 11. Comunicación entre frontend y backend
-
-El frontend utiliza un proxy configurado en `frontend/vite.config.ts`.
-
-| Ruta frontend | Microservicio | Puerto |
+| `DB_PASSWORD` | Contraseña local de las cinco instancias PostgreSQL de Compose |
+| `JWT_SECRET_KEY` | Firma JWT de auth; mínimo 32 caracteres |
+| `SEED_PASSWORD` y `SEED_*_EMAIL` | Credenciales demo antes del primer seed |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Recuperación de contraseña mediante SMTP |
+| `PASSWORD_RESET_URL` | URL de la interfaz que recibirá el token de recuperación |
+| `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` | Enriquecimiento opcional de canciones |
+
+Compose proporciona `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_NAME`,
+`AUTH_SERVICE_URL`, `CATALOG_SERVICE_URL` y `EVENT_SERVICE_URL` según el servicio.
+Las bases no publican puertos. No se necesita SMTP ni Spotify para arrancar,
+crear datos o ejecutar tests. Sin SMTP configurado, el envío de recuperación
+puede devolver 503. La página React de restablecimiento de contraseña está
+pendiente; `PASSWORD_RESET_URL` debe apuntar a una interfaz que realmente exista
+si se desea probar el flujo completo con correo.
+
+| Cuenta | Correo por defecto | Contraseña por defecto |
 |---|---|---|
-| `/api/auth` | Autenticación | 8001 |
-| `/api/eventos` | Eventos | 8002 |
-| `/api/catalogo` | Catálogo Musical | 8003 |
-| `/api/tienda` | Comercio | 8004 |
-| `/api/proveedores` | Proveedores | 8005 |
+| Administrador | demo.admin@subsonic.example.com | DemoSubsonic2026! |
+| Proveedor | demo.provider@subsonic.example.com | DemoSubsonic2026! |
+| Cliente | demo.client@subsonic.example.com | DemoSubsonic2026! |
 
-Esta configuración permite realizar las peticiones desde React sin escribir directamente los puertos de los microservicios en cada componente.
+El seed incluye artistas, canciones, géneros como campo del artista, un festival,
+line-up, pase, una entrada demo, productos con tallas y stock, empresa, servicio,
+espacio y propuesta. Las referencias entre servicios usan identificadores
+`demo_*`. No se integra ninguna pasarela de pagos.
 
-La comunicación se realiza mediante peticiones HTTP y respuestas JSON.
+El primer arranque ya ejecuta el seed. Para repetirlo:
 
-Las operaciones protegidas envían el token JWT en la cabecera `Authorization`.
-
-## 12. Funcionalidades implementadas
-
-### Autenticación y usuarios
-
-- Registro de nuevos usuarios.
-- Inicio y cierre de sesión.
-- Autenticación mediante JWT.
-- Roles `client`, `provider` y `admin`.
-- Consulta de datos del usuario autenticado.
-- Restricciones de acceso según los permisos.
-
-### Eventos
-
-- Consulta de eventos registrados.
-- Visualización de festivales disponibles.
-- API para crear, modificar y eliminar eventos con los permisos correspondientes.
-
-### Catálogo Musical
-
-- Consulta de artistas.
-- Información musical almacenada en PostgreSQL.
-- APIs para gestionar los elementos del catálogo.
-
-### Comercio
-
-- Consulta de productos de merchandising.
-- Variantes de productos y tallas.
-- Consulta de existencias.
-- Realización de pedidos autenticados.
-- Actualización del stock tras una compra.
-- Consulta del historial de pedidos.
-
-### Proveedores
-
-- Registro de empresas proveedoras.
-- Gestión de espacios y servicios.
-- Propuestas de presupuesto.
-- Consulta de propuestas de una empresa.
-- Consulta de la propia empresa mediante `GET /providers/me`.
-- Listado administrativo de proveedores.
-
-### Frontend React
-
-La interfaz permite:
-
-- Navegar entre las secciones principales.
-- Consultar eventos y artistas.
-- Registrarse e iniciar sesión.
-- Comprar productos de merchandising.
-- Consultar pedidos.
-- Acceder al panel del proveedor.
-- Consultar el listado administrativo de proveedores.
-
-Las funciones disponibles en la interfaz dependen del rol del usuario.
-
-No todas las operaciones administrativas del backend tienen todavía un formulario específico en React.
-
-## 13. Documentación de las APIs
-
-Los cinco microservicios ofrecen Swagger UI.
-
-| Servicio | URL |
-|---|---|
-| Autenticación | http://127.0.0.1:8001/docs |
-| Eventos | http://127.0.0.1:8002/docs |
-| Catálogo | http://127.0.0.1:8003/docs |
-| Comercio | http://127.0.0.1:8004/docs |
-| Proveedores | http://127.0.0.1:8005/docs |
-
-Cada API también expone su contrato a través de `/openapi.json`.
-
-Los archivos `openapi.yaml` del repositorio contienen la definición de los servicios.
-
-## 14. Pruebas automatizadas
-
-Cada microservicio dispone de pruebas automatizadas con pytest.
-
-Para ejecutarlas, debe utilizarse el entorno virtual de cada servicio.
-
-Por ejemplo, desde `auth-service/generated`:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest tests -q
+```bash
+docker compose run --rm auth-seed
+docker compose run --rm catalog-seed
+docker compose run --rm event-seed
+docker compose run --rm commerce-seed
+docker compose run --rm provider-seed
 ```
 
-Este procedimiento se repite en los demás microservicios, dentro de sus carpetas `generated`.
+No duplica registros ni sobrescribe contraseñas o stock existentes. Cambiar las
+variables demo después del primer seed no modifica las cuentas ya creadas.
+Fuera de Docker: `python scripts/seed.py --service auth`, con las dependencias
+y el `.env` del servicio configurados; repetir para los otros cuatro servicios.
+`python scripts/seed.py` los ejecuta todos con el intérprete actual.
 
-Resultados obtenidos durante el desarrollo y las comprobaciones de integración:
+## Pruebas y contratos
 
-| Microservicio | Tests superados |
-|---|---:|
-| Autenticación | 28 |
-| Eventos | 27 |
-| Catálogo Musical | 27 |
-| Comercio | 56 |
-| Proveedores | 46 |
-| **Total** | **184** |
+Con Compose en ejecución y Python 3.14 en el host:
 
-Los 181 tests iniciales se ampliaron a 184 después de incorporar tres pruebas para el endpoint `GET /providers/me`.
+```bash
+python scripts/test_compose.py
+```
 
-Estas pruebas comprueban, entre otros aspectos, el acceso de proveedores, el rechazo de clientes sin permisos y el comportamiento cuando un proveedor no tiene empresa registrada.
+El script instala dependencias de desarrollo en los contenedores y ejecuta cada
+suite en una base `*_test`, además de las pruebas de inicio/seed en otra
+`*_seed_test`. No utiliza las bases demo para los tests que borran tablas.
+Admite `--service auth` y `--project <nombre>`. No ejecutar suites concurrentes
+contra una misma base de pruebas.
 
-Los tests del backend han finalizado correctamente en las comprobaciones realizadas durante el desarrollo.
+El recuento histórico **181/184 corresponde a tests**, no a endpoints. Los 184
+existentes incluyen tres pruebas de `/providers/me`; se añaden cinco pruebas del
+límite de invalidación JWT y cinco pruebas de inicialización/seed. El resultado
+final se registra en [verificaciones](docs/validation.md).
 
-## 15. Pruebas funcionales e integración
+Para validar OpenAPI desde un entorno Python:
 
-Además de pytest, se han realizado peticiones HTTP reales entre los microservicios.
+```bash
+python -m pip install -r scripts/requirements.txt
+python scripts/validate_openapi.py
+```
 
-Entre los flujos comprobados se encuentran:
+Con las dependencias de backend instaladas:
+`python scripts/check_runtime_contracts.py` contrasta contratos y FastAPI;
+`python scripts/smoke.py` comprueba el despliegue por HTTP y requiere
+`python-dotenv`. También puede ejecutarse el smoke desde Docker:
 
-- Registro y autenticación de usuarios.
-- Generación y validación de tokens JWT.
-- Permisos de administrador, proveedor y cliente.
-- Registro y consulta de empresas proveedoras.
-- Comunicación de Proveedores con Autenticación.
-- Creación y consulta de eventos.
-- Publicación de espacios asociados a eventos.
-- Registro y consulta de propuestas.
-- Comunicación de Proveedores con Eventos.
-- Creación y consulta de artistas.
-- Creación de productos con variantes y existencias.
-- Registro de pedidos.
-- Actualización del stock después de una compra.
+```bash
+docker compose exec -T auth python /app/scripts/smoke.py --url http://frontend
+```
 
-También se ha probado la aplicación frontend utilizando cuentas con distintos roles.
+Las especificaciones raíz son la fuente de verdad. `bash scripts/generate.sh`
+(Linux o Git Bash en Windows) genera candidatos en una carpeta temporal;
+requiere Docker o Java y el JAR de OpenAPI Generator 7.26.0. No sobrescribe el
+código manual de `generated/`. Ver [contratos](docs/openapi.md).
 
-Se han comprobado el acceso administrativo, la consulta de la empresa del proveedor, sus propuestas y las restricciones aplicadas a clientes.
+GitHub Actions comprueba backend con PostgreSQL 15, inicio/seed, contratos,
+lint y build del frontend, construcción y arranque de Compose y smoke HTTP.
+El workflow está preparado; su ejecución en GitHub requiere que los cambios
+sean publicados por el equipo. Este trabajo no realiza push.
 
-Las operaciones de tienda e historial de pedidos se han probado con datos almacenados en PostgreSQL.
+## Desarrollo sin Docker
 
-Por último, el frontend ha superado las comprobaciones `npm run lint` y `npm run build`.
+Versiones usadas para la validación: **Python 3.14**, **PostgreSQL 15** y
+**Node 24**. Las plantillas antiguas de Docker indicaban Python 3.10; no se ha
+validado esa versión en este trabajo. Uvicorn, Click y websockets se han
+actualizado conjuntamente para permitir el arranque real en Python 3.14.
 
-Estas comprobaciones verifican los flujos indicados, aunque no constituyen una batería exhaustiva de pruebas de seguridad, rendimiento o despliegue.
+Crear un entorno virtual por servicio, instalar su `requirements-dev.txt`,
+copiar `generated/.env.example` a `generated/.env` y configurar un rol/base
+PostgreSQL que ya exista. FastAPI crea las tablas, pero no crea roles ni bases.
+Los requisitos completos y ejemplos están en [configuración](docs/setup.md).
 
-## 16. Estado del proyecto
+Ejemplo para auth desde la raíz:
 
-Las principales funcionalidades de los cinco microservicios y del frontend se encuentran integradas en la rama `main`.
+```powershell
+# Windows
+py -3.14 -m venv auth-service/generated/.venv
+.\auth-service\generated\.venv\Scripts\python -m pip install -r auth-service/generated/requirements-dev.txt
+Copy-Item auth-service/generated/.env.example auth-service/generated/.env
+# Configurar DB_* y JWT_SECRET_KEY antes de continuar.
+.\auth-service\generated\.venv\Scripts\python scripts/seed.py --service auth
+.\auth-service\generated\.venv\Scripts\python -m uvicorn openapi_server.main:app --app-dir auth-service/generated/src --host 127.0.0.1 --port 8001
+```
 
-El backend dispone de persistencia PostgreSQL, autenticación, control de permisos y pruebas automatizadas.
+```bash
+# Linux
+python3.14 -m venv auth-service/generated/.venv
+auth-service/generated/.venv/bin/python -m pip install -r auth-service/generated/requirements-dev.txt
+cp auth-service/generated/.env.example auth-service/generated/.env
+# Configurar DB_* y JWT_SECRET_KEY antes de continuar.
+auth-service/generated/.venv/bin/python scripts/seed.py --service auth
+auth-service/generated/.venv/bin/python -m uvicorn openapi_server.main:app --app-dir auth-service/generated/src --host 127.0.0.1 --port 8001
+```
 
-El frontend permite utilizar los principales flujos de consulta, autenticación, comercio y proveedores.
+Repetir el procedimiento para catalog, event, commerce y provider con los
+puertos de la tabla. Para el frontend: `cd frontend`, `npm ci`, `npm run dev`.
+Vite usa los servicios locales de la tabla; Docker utiliza Nginx para esas
+mismas rutas `/api/*`. `npm run lint` y `npm run build` ejecutan sus verificaciones.
 
-Durante las primeras tres semanas de la Práctica 2 se han desarrollado la arquitectura, la lógica de negocio, la persistencia, la interfaz y las pruebas principales.
+## Documentación técnica y coordinación
 
-La cuarta semana se dedica a corregir incidencias, revisar el cumplimiento de los requisitos y completar la documentación.
+- [Arquitectura y bases de datos](docs/architecture.md).
+- [Configuración, tablas y seed](docs/setup.md).
+- [Contratos y generación segura](docs/openapi.md).
+- [Infraestructura y coordinación con Práctica 3](docs/infrastructure.md).
+- [Pruebas](docs/testing.md), [endpoints](docs/endpoints.md) y [verificaciones](docs/validation.md).
+- [Informe de cambios](docs/work-report.md) y [decisiones tecnológicas](PosiblesTecnologías.md).
 
-El proyecto se ejecuta actualmente como entorno de desarrollo local. No se documenta como despliegue de producción.
-
-## 17. Buenas prácticas
-
-- Utilizar ramas de trabajo para nuevas funcionalidades y coordinar las integraciones en `main`.
-- No subir contraseñas ni archivos `.env`.
-- Mantener separados los datos reales y los datos de prueba.
-- Ejecutar los tests sobre las bases de datos `_test`.
-- Comprobar ESLint y la compilación del frontend.
-- Revisar los cambios antes de realizar commits.
-- Mantener actualizados los contratos OpenAPI.
-- Evitar sobrescribir implementaciones al regenerar código.
-- Documentar las nuevas funcionalidades y sus requisitos de ejecución.
-
-## 18. Repositorio
-
-Código fuente:
-
-https://github.com/amansoba/PracticaASEE
-
-Proyecto desarrollado en el contexto de la asignatura ASEE.
+Se conservan los Dockerfiles y Compose originales de cada servicio; las imágenes
+de integración están en `infra/`. El equipo de Práctica 3 deberá revisar su
+sustitución cuando están disponibles sus archivos definitivos. No se modifican
+archivos del frontend ni se añaden CRUD, pagos u otras funcionalidades de negocio.

@@ -24,8 +24,9 @@ assert test_name.endswith('_test')
 with psycopg.connect(host=os.environ['DB_HOST'], port=os.environ['DB_PORT'],
                      user=os.environ['DB_USER'], password=os.environ['DB_PASSWORD'],
                      dbname='postgres', autocommit=True) as db:
-    if not db.execute('SELECT 1 FROM pg_database WHERE datname=%s', (test_name,)).fetchone():
-        db.execute(sql.SQL('CREATE DATABASE {}').format(sql.Identifier(test_name)))
+    for name in (test_name, f'subsonic_{database}_seed_test'):
+        if not db.execute('SELECT 1 FROM pg_database WHERE datname=%s', (name,)).fetchone():
+            db.execute(sql.SQL('CREATE DATABASE {}').format(sql.Identifier(name)))
 config = {key: os.environ[key] for key in ('DB_HOST','DB_PORT','DB_USER','DB_PASSWORD')}
 config['DB_NAME'] = test_name
 config['AUTH_SERVICE_URL'] = 'http://auth:8000'
@@ -35,6 +36,8 @@ for key, value in config.items():
     set_key('.env.test', key, value)
 subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', 'requirements-dev.txt'], check=True)
 subprocess.run([sys.executable, '-m', 'pytest', 'tests', '-q', '-p', 'no:cacheprovider'], check=True)
+subprocess.run([sys.executable, '-m', 'pytest', '/app/tests/test_setup.py', '-k', service,
+                '-q', '-p', 'no:cacheprovider'], check=True)
 '''
 
 

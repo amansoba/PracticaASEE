@@ -178,18 +178,6 @@ class AutenticacinApiImpl(BaseAutenticacinApi):
             )
 
     # POST /auth/logout
-    # Pendiente de implementar revocacion de tokens
-    async def logout_user(
-        self
-    ) -> None:
-
-        raise HTTPException(
-            status_code=501,
-            detail="Cierre de sesion pendiente de implementar"
-        )
-
-    
-    # POST /auth/logout
     # Revocar el JWT utilizado para cerrar la sesion
     async def logout_user(
         self,

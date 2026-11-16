@@ -3,6 +3,8 @@
 Se inspeccionaron las ramas locales y referencias remotas disponibles (main,
 feature/auth, catalog, catalog-oscar, commerce-oscar, events, providers-oscar,
 integration/oscar). No había una rama identificada como Práctica 3.
+Los Dockerfiles originales tienen el mismo contenido en todas las referencias
+disponibles que los incluyen; no se encontró una versión alternativa terminada.
 Los cinco Dockerfiles actuales son plantillas equivalentes con Python 3.10,
 tests durante la construcción y sin comando de arranque; sus Compose solo
 levantan un servicio sin PostgreSQL. No sirven para el arranque integrado.

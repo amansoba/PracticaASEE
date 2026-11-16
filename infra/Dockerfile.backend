@@ -7,6 +7,8 @@ COPY ${SERVICE}-service/generated/requirements.txt /tmp/requirements.txt
 RUN python -m pip install --no-cache-dir -r /tmp/requirements.txt
 COPY ${SERVICE}-service/generated /app/${SERVICE}-service/generated
 COPY scripts /app/scripts
+COPY tests /app/tests
+COPY pytest.ini /app/pytest.ini
 ENV PYTHONPATH=/app/${SERVICE}-service/generated/src
 WORKDIR /app/${SERVICE}-service/generated
 EXPOSE 8000
