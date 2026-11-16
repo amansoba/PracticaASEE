@@ -1,6 +1,5 @@
-
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   obtenerProductos,
   crearPedido,
@@ -8,9 +7,32 @@ import {
 } from "../services/tienda";
 import { useAuth } from "../context/useAuth";
 
+interface ItemCarrito {
+  productId: string;
+  name: string;
+  size: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+const CARRITO_KEY = "subsonic_carrito";
+
+function leerCarrito(): ItemCarrito[] {
+  try {
+    const datos = sessionStorage.getItem(CARRITO_KEY);
+    return datos ? (JSON.parse(datos) as ItemCarrito[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function guardarCarrito(items: ItemCarrito[]) {
+  sessionStorage.setItem(CARRITO_KEY, JSON.stringify(items));
+}
+
 function Tienda() {
   const navigate = useNavigate();
-  const { usuario, token } = useAuth();
+  const { usuario } = useAuth();
 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -20,6 +42,7 @@ function Tienda() {
   const [direcciones, setDirecciones] = useState<Record<string, string>>({});
   const [procesando, setProcesando] = useState<string | null>(null);
   const [mensajes, setMensajes] = useState<Record<string, string>>({});
+  const [carrito, setCarrito] = useState<ItemCarrito[]>(leerCarrito);
 
   async function cargarProductos() {
     try {
@@ -36,8 +59,55 @@ function Tienda() {
     void cargarProductos();
   }, []);
 
+  function añadirAlCarrito(producto: Producto) {
+    if (!usuario) {
+      navigate("/login");
+      return;
+    }
+
+    const talla = tallas[producto.id];
+    const cantidad = cantidades[producto.id] ?? 1;
+    const variante = producto.variants.find((v) => v.size === talla);
+
+    if (!talla || !variante || cantidad > variante.stock) {
+      setMensajes((m) => ({
+        ...m,
+        [producto.id]: "Selecciona una talla con stock suficiente.",
+      }));
+      return;
+    }
+
+    const existente = carrito.find(
+      (it) => it.productId === producto.id && it.size === talla
+    );
+
+    const nuevos = existente
+      ? carrito.map((it) =>
+          it.productId === producto.id && it.size === talla
+            ? { ...it, quantity: it.quantity + cantidad }
+            : it
+        )
+      : [
+          ...carrito,
+          {
+            productId: producto.id,
+            name: producto.name,
+            size: talla,
+            quantity: cantidad,
+            unitPrice: producto.price,
+          },
+        ];
+
+    guardarCarrito(nuevos);
+    setCarrito(nuevos);
+    setMensajes((m) => ({
+      ...m,
+      [producto.id]: "Añadido al carrito",
+    }));
+  }
+
   async function confirmarCompra(producto: Producto) {
-    if (!usuario || !token) {
+    if (!usuario) {
       navigate("/login");
       return;
     }
@@ -47,61 +117,51 @@ function Tienda() {
     const direccion = direcciones[producto.id]?.trim();
 
     if (!talla || !direccion) {
-      setMensajes({
-        ...mensajes,
+      setMensajes((m) => ({
+        ...m,
         [producto.id]: "Selecciona una talla e introduce tu dirección.",
-      });
+      }));
       return;
     }
 
-    const variante = producto.variants.find(
-      (item) => item.size === talla
-    );
+    const variante = producto.variants.find((item) => item.size === talla);
 
     if (!variante || cantidad > variante.stock) {
-      setMensajes({
-        ...mensajes,
+      setMensajes((m) => ({
+        ...m,
         [producto.id]: "No hay stock suficiente.",
-      });
+      }));
       return;
     }
 
     setProcesando(producto.id);
-    setMensajes({ ...mensajes, [producto.id]: "" });
+    setMensajes((m) => ({ ...m, [producto.id]: "" }));
 
     try {
-      const pedido = await crearPedido(
-        {
-          user_id: usuario.id,
-          shipping_address: direccion,
-          items: [
-            {
-              product_id: producto.id,
-              size: talla,
-              quantity: cantidad,
-              unit_price: producto.price,
-            },
-          ],
-        },
-        token
-      );
+      const pedido = await crearPedido({
+        user_id: usuario.id,
+        shipping_address: direccion,
+        items: [
+          {
+            product_id: producto.id,
+            size: talla,
+            quantity: cantidad,
+            unit_price: producto.price,
+          },
+        ],
+      });
 
-      setMensajes((anteriores) => ({
-        ...anteriores,
+      setMensajes((m) => ({
+        ...m,
         [producto.id]: `Pedido ${pedido.id} registrado. Total: ${pedido.total_price.toFixed(2)} €`,
       }));
 
-      setCantidades((anteriores) => ({
-        ...anteriores,
-        [producto.id]: 1,
-      }));
-
+      setCantidades((c) => ({ ...c, [producto.id]: 1 }));
       await cargarProductos();
     } catch (err) {
-      setMensajes((anteriores) => ({
-        ...anteriores,
-        [producto.id]:
-          err instanceof Error ? err.message : "Error al realizar la compra",
+      setMensajes((m) => ({
+        ...m,
+        [producto.id]: err instanceof Error ? err.message : "Error al realizar la compra",
       }));
     } finally {
       setProcesando(null);
@@ -114,6 +174,13 @@ function Tienda() {
         <p className="subtitulo">MERCHANDISING OFICIAL</p>
         <h1>Tienda Subsonic</h1>
         <p>Selecciona tu producto y realiza tu pedido.</p>
+        {usuario?.role === "client" && (
+          <p style={{ marginTop: 16 }}>
+            <Link to="/carrito" className="navbar-login">
+              Ver carrito ({carrito.reduce((s, i) => s + i.quantity, 0)})
+            </Link>
+          </p>
+        )}
       </div>
 
       {cargando && <p>Cargando productos...</p>}
@@ -127,9 +194,7 @@ function Tienda() {
         {productos.map((producto) => {
           const talla = tallas[producto.id] ?? "";
           const cantidad = cantidades[producto.id] ?? 1;
-          const variante = producto.variants.find(
-            (item) => item.size === talla
-          );
+          const variante = producto.variants.find((item) => item.size === talla);
           const stock = variante?.stock ?? 0;
           const comprando = procesando === producto.id;
 
@@ -147,14 +212,8 @@ function Tienda() {
                     id={`talla-${producto.id}`}
                     value={talla}
                     onChange={(e) => {
-                      setTallas((anteriores) => ({
-                        ...anteriores,
-                        [producto.id]: e.target.value,
-                      }));
-                      setCantidades((anteriores) => ({
-                        ...anteriores,
-                        [producto.id]: 1,
-                      }));
+                      setTallas((a) => ({ ...a, [producto.id]: e.target.value }));
+                      setCantidades((a) => ({ ...a, [producto.id]: 1 }));
                     }}
                   >
                     <option value="">Selecciona una talla</option>
@@ -179,12 +238,9 @@ function Tienda() {
                     disabled={!variante || stock === 0}
                     onChange={(e) => {
                       const valor = Number(e.target.value);
-                      setCantidades((anteriores) => ({
-                        ...anteriores,
-                        [producto.id]: Math.min(
-                          Math.max(valor || 1, 1),
-                          stock
-                        ),
+                      setCantidades((a) => ({
+                        ...a,
+                        [producto.id]: Math.min(Math.max(valor || 1, 1), stock),
                       }));
                     }}
                   />
@@ -198,8 +254,8 @@ function Tienda() {
                     placeholder="Calle, número, ciudad..."
                     value={direcciones[producto.id] ?? ""}
                     onChange={(e) =>
-                      setDirecciones((anteriores) => ({
-                        ...anteriores,
+                      setDirecciones((a) => ({
+                        ...a,
                         [producto.id]: e.target.value,
                       }))
                     }
@@ -214,8 +270,19 @@ function Tienda() {
                     disabled={!variante || cantidad > stock || comprando}
                     onClick={() => void confirmarCompra(producto)}
                   >
-                    {comprando ? "Procesando..." : "Confirmar compra"}
+                    {comprando ? "Procesando..." : "Comprar ahora"}
                   </button>
+
+                  {usuario?.role === "client" && (
+                    <button
+                      type="button"
+                      disabled={!variante || cantidad > stock}
+                      onClick={() => añadirAlCarrito(producto)}
+                      style={{ marginTop: 8, background: "#581c87" }}
+                    >
+                      Añadir al carrito
+                    </button>
+                  )}
 
                   {mensajes[producto.id] && (
                     <p role="status">{mensajes[producto.id]}</p>

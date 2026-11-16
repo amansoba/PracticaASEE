@@ -1,23 +1,20 @@
-
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { obtenerPedidosUsuario, type Pedido } from "../services/tienda";
 
 function MisPedidos() {
-  const { usuario, token } = useAuth();
+  const { usuario } = useAuth();
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
 
-    useEffect(() => {
-    if (!usuario || !token) {
-      return;
-    }
+  useEffect(() => {
+    if (!usuario) return;
 
     let activo = true;
 
-    obtenerPedidosUsuario(usuario.id, token)
+    obtenerPedidosUsuario(usuario.id)
       .then((datos) => {
         if (activo) setPedidos(datos);
       })
@@ -37,9 +34,9 @@ function MisPedidos() {
     return () => {
       activo = false;
     };
-  }, [usuario, token]);
+  }, [usuario]);
 
-  if (!usuario || !token) {
+  if (!usuario) {
     return (
       <main className="pagina-eventos">
         <h1>Mis pedidos</h1>
@@ -68,11 +65,13 @@ function MisPedidos() {
 
       <div className="eventos-grid">
         {pedidos.map((pedido) => (
-          <article className="evento-card" key={pedido.id}>
+          <Link
+            to={`/mis-pedidos/${pedido.id}`}
+            className="evento-card"
+            key={pedido.id}
+          >
             <div className="evento-card-contenido">
-              <span className="evento-etiqueta">
-                {pedido.status}
-              </span>
+              <span className="evento-etiqueta">{pedido.status}</span>
 
               <h2>Pedido</h2>
               <p className="pedido-identificador">{pedido.id}</p>
@@ -97,7 +96,7 @@ function MisPedidos() {
 
               <h3>Total: {pedido.total_price.toFixed(2)} €</h3>
             </div>
-          </article>
+          </Link>
         ))}
       </div>
     </main>

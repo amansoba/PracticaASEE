@@ -1,3 +1,4 @@
+import { api } from "./api";
 
 export interface Artista {
   id: string;
@@ -80,27 +81,20 @@ export async function obtenerArtistas(
   }
 
   const consulta = parametros.toString();
-  const respuesta = await fetch(
-    consulta ? `/api/catalogo/artists?${consulta}` : "/api/catalogo/artists"
-  );
 
-  if (!respuesta.ok) {
-    await lanzarError(respuesta, "No se pudieron cargar los artistas");
-  }
+  const ruta = consulta
+    ? `/api/catalogo/artists?${consulta}`
+    : "/api/catalogo/artists";
 
-  return respuesta.json() as Promise<Artista[]>;
+  return api.get<Artista[]>(ruta);
 }
 
-export async function obtenerArtista(id: string): Promise<Artista> {
-  const respuesta = await fetch(
+export async function obtenerArtista(
+  id: string
+): Promise<Artista> {
+  return api.get<Artista>(
     `/api/catalogo/artists/${encodeURIComponent(id)}`
   );
-
-  if (!respuesta.ok) {
-    await lanzarError(respuesta, "No se pudo cargar el artista");
-  }
-
-  return respuesta.json() as Promise<Artista>;
 }
 
 export async function crearArtista(

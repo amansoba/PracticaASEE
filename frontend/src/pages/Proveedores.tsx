@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
@@ -8,21 +7,16 @@ import {
   obtenerMiEmpresa,
   obtenerPropuestasProveedor,
   type Proveedor,
-  type MiEmpresaProveedor,
   type PropuestaProveedor,
 } from "../services/proveedores";
 
 interface PanelProveedoresProps {
   usuario: Usuario;
-  token: string;
 }
 
-function PanelProveedores({
-  usuario,
-  token,
-}: PanelProveedoresProps) {
+function PanelProveedores({ usuario }: PanelProveedoresProps) {
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
-  const [miEmpresa, setMiEmpresa] = useState<MiEmpresaProveedor | null>(null);
+  const [miEmpresa, setMiEmpresa] = useState<Proveedor | null>(null);
   const [propuestas, setPropuestas] = useState<PropuestaProveedor[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -33,28 +27,15 @@ function PanelProveedores({
     async function cargarDatos() {
       try {
         if (usuario.role === "admin") {
-          const datos = await obtenerProveedores(token);
-
-          if (activo) {
-            setProveedores(datos);
-          }
+          const datos = await obtenerProveedores();
+          if (activo) setProveedores(datos);
         } else if (usuario.role === "provider") {
-          const empresa = await obtenerMiEmpresa(token);
-
-          if (!activo) {
-            return;
-          }
-
+          const empresa = await obtenerMiEmpresa();
+          if (!activo) return;
           setMiEmpresa(empresa);
 
-          const datos = await obtenerPropuestasProveedor(
-            empresa.id,
-            token
-          );
-
-          if (activo) {
-            setPropuestas(datos);
-          }
+          const datos = await obtenerPropuestasProveedor(empresa.id);
+          if (activo) setPropuestas(datos);
         }
       } catch (err) {
         if (activo) {
@@ -65,9 +46,7 @@ function PanelProveedores({
           );
         }
       } finally {
-        if (activo) {
-          setCargando(false);
-        }
+        if (activo) setCargando(false);
       }
     }
 
@@ -76,7 +55,7 @@ function PanelProveedores({
     return () => {
       activo = false;
     };
-  }, [usuario, token]);
+  }, [usuario]);
 
   if (usuario.role === "provider") {
     return (
@@ -91,32 +70,24 @@ function PanelProveedores({
         </div>
 
         {cargando && <p>Cargando información...</p>}
-
         {error && <p role="alert">{error}</p>}
 
         {miEmpresa && (
           <section>
             <h2>Mi empresa</h2>
-
             <div className="eventos-grid">
               <article className="evento-card">
                 <div className="evento-card-contenido">
                   <span className="evento-etiqueta">
                     {miEmpresa.service_category}
                   </span>
-
                   <h2>{miEmpresa.company_name}</h2>
-
                   <p>CIF/NIF: {miEmpresa.cif_nif}</p>
-
                   <p>
                     Contacto:{" "}
                     {miEmpresa.contact_email || "No especificado"}
                   </p>
-
-                  <p className="pedido-identificador">
-                    ID: {miEmpresa.id}
-                  </p>
+                  <p className="pedido-identificador">ID: {miEmpresa.id}</p>
                 </div>
               </article>
             </div>
@@ -126,41 +97,24 @@ function PanelProveedores({
         {miEmpresa && !error && (
           <section>
             <h2>Mis propuestas</h2>
-
             {!cargando && propuestas.length === 0 && (
               <p>Todavía no tienes propuestas registradas.</p>
             )}
-
             <div className="eventos-grid">
               {propuestas.map((propuesta) => (
-                <article
-                  className="evento-card"
-                  key={propuesta.id}
-                >
+                <article className="evento-card" key={propuesta.id}>
                   <div className="evento-card-contenido">
-                    <span className="evento-etiqueta">
-                      {propuesta.status}
-                    </span>
-
+                    <span className="evento-etiqueta">{propuesta.status}</span>
                     <h2>Propuesta de presupuesto</h2>
-
                     <p>Evento: {propuesta.event_id}</p>
-
                     <p>
                       Presupuesto:{" "}
                       {propuesta.budget_proposal.toFixed(2)} €
                     </p>
-
                     {propuesta.setup_date && (
-                      <p>
-                        Fecha de montaje:{" "}
-                        {propuesta.setup_date}
-                      </p>
+                      <p>Fecha de montaje: {propuesta.setup_date}</p>
                     )}
-
-                    <p className="pedido-identificador">
-                      ID: {propuesta.id}
-                    </p>
+                    <p className="pedido-identificador">ID: {propuesta.id}</p>
                   </div>
                 </article>
               ))}
@@ -180,9 +134,7 @@ function PanelProveedores({
       </div>
 
       {cargando && <p>Cargando proveedores...</p>}
-
       {error && <p role="alert">{error}</p>}
-
       {!cargando && !error && proveedores.length === 0 && (
         <p>No hay proveedores registrados.</p>
       )}
@@ -194,19 +146,13 @@ function PanelProveedores({
               <span className="evento-etiqueta">
                 {proveedor.service_category}
               </span>
-
               <h2>{proveedor.company_name}</h2>
-
               <p>CIF/NIF: {proveedor.cif_nif}</p>
-
               <p>
                 Contacto:{" "}
                 {proveedor.contact_email || "No especificado"}
               </p>
-
-              <p className="pedido-identificador">
-                ID: {proveedor.id}
-              </p>
+              <p className="pedido-identificador">ID: {proveedor.id}</p>
             </div>
           </article>
         ))}
@@ -216,14 +162,13 @@ function PanelProveedores({
 }
 
 function Proveedores() {
-  const { usuario, token } = useAuth();
+  const { usuario } = useAuth();
 
-  if (!usuario || !token) {
+  if (!usuario) {
     return (
       <main className="pagina-eventos">
         <h1>Proveedores</h1>
         <p>Inicia sesión para acceder a esta sección.</p>
-
         <Link to="/login" className="navbar-login">
           Iniciar sesión
         </Link>
@@ -235,20 +180,12 @@ function Proveedores() {
     return (
       <main className="pagina-eventos">
         <h1>Proveedores</h1>
-        <p>
-          Esta sección está reservada a proveedores y administradores.
-        </p>
+        <p>Esta sección está reservada a proveedores y administradores.</p>
       </main>
     );
   }
 
-  return (
-    <PanelProveedores
-      key={`${usuario.id}-${token}`}
-      usuario={usuario}
-      token={token}
-    />
-  );
+  return <PanelProveedores usuario={usuario} />;
 }
 
 export default Proveedores;

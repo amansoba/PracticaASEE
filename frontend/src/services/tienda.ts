@@ -1,3 +1,4 @@
+import { api } from "./api";
 
 export interface VarianteProducto {
   size: string;
@@ -14,17 +15,6 @@ export interface Producto {
   variants: VarianteProducto[];
 }
 
-export async function obtenerProductos(): Promise<Producto[]> {
-  const respuesta = await fetch("/api/tienda/products");
-
-  if (!respuesta.ok) {
-    throw new Error("No se pudieron cargar los productos");
-  }
-
-  return respuesta.json();
-}
-
-
 export interface ArticuloPedido {
   product_id: string;
   size: string;
@@ -36,6 +26,7 @@ export interface DatosPedido {
   user_id: string;
   items: ArticuloPedido[];
   shipping_address: string;
+  payment_method_id?: string;
 }
 
 export interface Pedido {
@@ -47,64 +38,33 @@ export interface Pedido {
   created_at: string;
 }
 
-export async function crearPedido(
-  datos: DatosPedido,
-  token: string
-): Promise<Pedido> {
-  const respuesta = await fetch("/api/tienda/orders", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(datos),
-  });
-
-  if (!respuesta.ok) {
-    if (respuesta.status === 401) {
-      throw new Error("Debes iniciar sesión para comprar");
-    }
-
-    if (respuesta.status === 403) {
-      throw new Error("No tienes permiso para realizar este pedido");
-    }
-
-    if (respuesta.status === 409) {
-      throw new Error("No hay stock suficiente");
-    }
-
-    throw new Error("No se pudo registrar el pedido");
-  }
-
-  return respuesta.json();
+export async function obtenerProductos(): Promise<Producto[]> {
+  return api.get("/api/tienda/products");
 }
 
+export async function obtenerProducto(id: string): Promise<Producto> {
+  return api.get(`/api/tienda/products/${encodeURIComponent(id)}`);
+}
+
+export async function crearPedido(datos: DatosPedido): Promise<Pedido> {
+  return api.post("/api/tienda/orders", datos);
+}
 
 export async function obtenerPedidosUsuario(
-  userId: string,
-  token: string
+  userId: string
 ): Promise<Pedido[]> {
-  const respuesta = await fetch(
-    `/api/tienda/orders/user/${encodeURIComponent(userId)}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+  return api.get(`/api/tienda/orders/user/${encodeURIComponent(userId)}`);
+}
 
-  if (!respuesta.ok) {
-    if (respuesta.status === 401) {
-      throw new Error("Tu sesión no es válida o ha caducado");
-    }
+export async function obtenerPedido(id: string): Promise<Pedido> {
+  return api.get(`/api/tienda/orders/${encodeURIComponent(id)}`);
+}
 
-    if (respuesta.status === 403) {
-      throw new Error("No tienes permiso para consultar estos pedidos");
-    }
-
-    throw new Error("No se pudo cargar el historial de pedidos");
-  }
-
-  return respuesta.json();
+export async function actualizarEstadoPedido(
+  id: string,
+  status: string
+): Promise<void> {
+  return api.put(`/api/tienda/orders/${encodeURIComponent(id)}/status`, {
+    status,
+  });
 }
