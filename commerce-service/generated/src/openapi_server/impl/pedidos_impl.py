@@ -550,3 +550,72 @@ class PedidosApiImpl(BasePedidosApi):
             except Exception:
                 db.rollback()
                 raise
+
+    # POST /orders/{id}/pay
+    async def pay_order(
+        self,
+        id: str,
+        payment_token: str,
+        usuario_actual: dict
+    ) -> None:
+        """
+        Simula el pago de un pedido pendiente.
+
+        No realiza ningun cobro real ni se conecta
+        con una pasarela de pagos.
+        """
+
+        with SessionLocal() as db:
+            try:
+                # Bloquear el pedido para evitar que
+                # dos pagos simultaneos lo procesen
+                # dos veces o interfieran con su cancelacion.
+                pedido = db.scalar(
+                    select(OrderDB)
+                    .where(OrderDB.id == id)
+                    .with_for_update()
+                )
+
+                if pedido is None:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="Pedido no encontrado"
+                    )
+
+                # Solo el propietario puede pagar.
+                comprobar_usuario(
+                    usuario_actual,
+                    pedido.user_id
+                )
+
+                # Solo admitimos la transicion
+                # pending -> paid.
+                if pedido.status != "pending":
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "Solo se pueden pagar "
+                            "pedidos pendientes"
+                        )
+                    )
+
+                # Token ficticio aceptado exclusivamente
+                # en este entorno de simulacion.
+                if payment_token != "tok_test_success":
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Pago simulado rechazado"
+                    )
+
+                # El stock ya se descuento cuando
+                # se creo el pedido.
+                # Aqui solo actualizamos su estado.
+                pedido.status = "paid"
+
+                db.commit()
+
+                return None
+
+            except Exception:
+                db.rollback()
+                raise

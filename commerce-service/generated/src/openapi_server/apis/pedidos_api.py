@@ -11,6 +11,7 @@ from fastapi import (
     Path
 )
 from fastapi.security import HTTPAuthorizationCredentials
+from pydantic import BaseModel
 
 from openapi_server.apis.pedidos_api_base import (
     BasePedidosApi
@@ -49,6 +50,14 @@ def obtener_implementacion():
         )
 
     return BasePedidosApi.subclasses[0]()
+
+
+# ============================================================
+# MODELO PARA EL PAGO SIMULADO
+# ============================================================
+
+class SimulatedPaymentRequest(BaseModel):
+    payment_token: str
 
 
 # ============================================================
@@ -217,5 +226,54 @@ async def cancel_order(
 
     return await obtener_implementacion().cancel_order(
         id,
+        usuario_actual
+    )
+
+
+# ============================================================
+# POST /orders/{id}/pay
+# ============================================================
+
+@router.post(
+    "/orders/{id}/pay",
+    tags=["Pedidos"],
+    summary="Simular el pago de un pedido pendiente",
+    status_code=200,
+    responses={
+        200: {
+            "description": "Pago simulado correctamente"
+        },
+        400: {
+            "description": "Token de pago simulado rechazado"
+        },
+        401: {
+            "description": "No autenticado"
+        },
+        403: {
+            "description": "El pedido pertenece a otro usuario"
+        },
+        404: {
+            "description": "Pedido no encontrado"
+        },
+        409: {
+            "description": "El pedido no puede pagarse"
+        },
+        422: {
+            "description": "Datos de pago incompletos"
+        },
+        503: {
+            "description": "Autenticacion no disponible"
+        }
+    }
+)
+async def pay_order(
+    id: str = Path(...),
+    payment_request: SimulatedPaymentRequest = Body(...),
+    usuario_actual: dict = Depends(obtener_usuario_actual)
+) -> None:
+
+    return await obtener_implementacion().pay_order(
+        id,
+        payment_request.payment_token,
         usuario_actual
     )
