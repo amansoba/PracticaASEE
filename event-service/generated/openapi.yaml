@@ -1,768 +1,691 @@
 openapi: 3.0.3
+
 info:
-  description: |
-    API responsable de la gestión de festivales, fechas, recintos, horarios/line-up, configuración de tipos de pases y emisión y venta de entradas.
-    El microservicio de Gestión de Eventos es propietario de las ediciones del festival, la programación horaria y las entradas adquiridas. Para operar se comunica con: - Catálogo Musical: realiza una consulta síncrona GET /artists/{id} para validar la existencia
+  title: API de Gestión de Eventos - Subsonic Festival
+  version: 1.2.0
+  description: >
+    API responsable de la gestión de festivales, fechas, recintos, horarios/line-up,
+    configuración de tipos de pases y emisión y venta de entradas.
+
+    El microservicio de Gestión de Eventos es propietario de las ediciones del festival,
+    la programación horaria y las entradas adquiridas. Para operar se comunica con:
+    - Catálogo Musical: realiza una consulta síncrona GET /artists/{id} para validar la existencia
       del artista antes de asignarlo a un escenario en el line-up.
     - Autenticación y Cuentas: realiza una consulta síncrona GET /users/{userId} al momento de
       la compra de entradas para asociar el pase emitido al usuario correspondiente.
     - Gestión de Proveedores: proporciona información del festival (GET /events/{id})
       para permitir la asignación de espacios y servicios externos.
-  title: API de Gestión de Eventos - Subsonic Festival
-  version: 1.2.0
+
 servers:
-- description: Servidor de desarrollo
-  url: https://api.subsonic.com/events/v1
+  - url: https://api.subsonic.com/events/v1
+    description: Servidor de desarrollo
+
 tags:
-- description: "Gestión general de festivales, ubicaciones y fechas"
-  name: Eventos
-- description: Horarios de actuaciones y asignación de escenarios
-  name: Line-up
-- description: "Configuración de tipos de pase, venta y consulta de entradas de usuarios"
-  name: Pases y Entradas
+  - name: Eventos
+    description: Gestión general de festivales, ubicaciones y fechas
+  - name: Line-up
+    description: Horarios de actuaciones y asignación de escenarios
+  - name: Pases y Entradas
+    description: Configuración de tipos de pase, venta y consulta de entradas de usuarios
+
 paths:
   /events:
     get:
-      description: |
+      tags:
+        - Eventos
+      summary: Listar todos los festivales y eventos
+      description: >
         Devuelve la lista general de eventos y ediciones de festivales configurados.
       operationId: getAllEvents
       responses:
-        "200":
+        '200':
+          description: Lista de eventos devuelta correctamente.
           content:
             application/json:
               schema:
-                items:
-                  $ref: "#/components/schemas/Event"
                 type: array
-          description: Lista de eventos devuelta correctamente.
-      summary: Listar todos los festivales y eventos
-      tags:
-      - Eventos
+                items:
+                  $ref: '#/components/schemas/Event'
     post:
-      description: |
+      tags:
+        - Eventos
+      summary: Crear un nuevo evento o edición
+      description: >
         Da de alta un festival indicando nombre, fechas y recinto. Operación restringida a administradores.
       operationId: createEvent
+      security:
+        - BearerAuth: []
       requestBody:
+        required: true
+        description: Información básica del evento.
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateEventRequest"
-        description: Información básica del evento.
-        required: true
+              $ref: '#/components/schemas/CreateEventRequest'
       responses:
-        "201":
+        '422':
+          description: Validation Error
+        '201':
+          description: Evento registrado exitosamente.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Event"
-          description: Evento registrado exitosamente.
-        "400":
+                $ref: '#/components/schemas/Event'
+        '400':
           description: Datos del evento incompletos.
-        "401":
+        '401':
           description: No autenticado.
-        "403":
+        '403':
           description: Acceso denegado. Requiere rol de administrador.
-      security:
-      - BearerAuth: []
-      summary: Crear un nuevo evento o edición
-      tags:
-      - Eventos
+
   /events/{id}:
-    delete:
-      description: |
-        Elimina un festival del sistema. Operación para administradores.
-      operationId: deleteEvent
-      parameters:
-      - description: Identificador del evento a cancelar.
-        example: evt_101
-        explode: false
-        in: path
-        name: id
-        required: true
-        schema:
-          type: string
-        style: simple
-      responses:
-        "204":
-          description: Evento eliminado satisfactoriamente.
-        "401":
-          description: No autenticado.
-        "403":
-          description: Acceso denegado.
-        "404":
-          description: Evento no encontrado.
-      security:
-      - BearerAuth: []
-      summary: Cancelar o eliminar un evento
-      tags:
-      - Eventos
     get:
-      description: |
-        Devuelve las fechas, recinto y ubicación de un festival. Endpoint consultado de forma síncrona por Gestión de Proveedores para asociar espacios y servicios.
+      tags:
+        - Eventos
+      summary: Consultar detalles de un evento
+      description: >
+        Devuelve las fechas, recinto y ubicación de un festival.
+        Endpoint consultado de forma síncrona por Gestión de Proveedores para asociar espacios y servicios.
       operationId: getEventById
       parameters:
-      - description: Identificador único del evento.
-        example: evt_101
-        explode: false
-        in: path
-        name: id
-        required: true
-        schema:
-          type: string
-        style: simple
+        - name: id
+          in: path
+          required: true
+          description: Identificador único del evento.
+          schema:
+            type: string
+          example: "evt_101"
       responses:
-        "200":
+        '422':
+          description: Validation Error
+        '200':
+          description: Detalles del evento.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Event"
-          description: Detalles del evento.
-        "404":
+                $ref: '#/components/schemas/Event'
+        '404':
           description: No existe ningún evento con el identificador proporcionado.
-      summary: Consultar detalles de un evento
-      tags:
-      - Eventos
     put:
-      description: |
+      tags:
+        - Eventos
+      summary: Actualizar información de un evento
+      description: >
         Permite actualizar fechas o recintos de un evento existente. Operación para administradores.
       operationId: updateEvent
+      security:
+        - BearerAuth: []
       parameters:
-      - description: Identificador del evento a actualizar.
-        example: evt_101
-        explode: false
-        in: path
-        name: id
-        required: true
-        schema:
-          type: string
-        style: simple
+        - name: id
+          in: path
+          required: true
+          description: Identificador del evento a actualizar.
+          schema:
+            type: string
+          example: "evt_101"
       requestBody:
+        required: true
+        description: Nuevos datos del evento.
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateEventRequest"
-        description: Nuevos datos del evento.
-        required: true
+              $ref: '#/components/schemas/CreateEventRequest'
       responses:
-        "200":
+        '422':
+          description: Validation Error
+        '200':
+          description: Evento actualizado correctamente.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Event"
-          description: Evento actualizado correctamente.
-        "401":
+                $ref: '#/components/schemas/Event'
+        '401':
           description: No autenticado.
-        "403":
+        '403':
           description: Acceso denegado.
-        "404":
+        '404':
           description: Evento no encontrado.
-      security:
-      - BearerAuth: []
-      summary: Actualizar información de un evento
+    delete:
       tags:
-      - Eventos
+        - Eventos
+      summary: Cancelar o eliminar un evento
+      description: >
+        Elimina un festival del sistema. Operación para administradores.
+      operationId: deleteEvent
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador del evento a cancelar.
+          schema:
+            type: string
+          example: "evt_101"
+      responses:
+        '422':
+          description: Validation Error
+        '204':
+          description: Evento eliminado satisfactoriamente.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Acceso denegado.
+        '404':
+          description: Evento no encontrado.
+
   /events/{id}/lineup:
     get:
-      description: |
+      tags:
+        - Line-up
+      summary: Obtener el cartel (Line-up) y horarios del festival
+      description: >
         Devuelve las actuaciones programadas en los escenarios y sus franjas horarias.
       operationId: getEventLineup
       parameters:
-      - description: Identificador del evento.
-        example: evt_101
-        explode: false
-        in: path
-        name: id
-        required: true
-        schema:
-          type: string
-        style: simple
+        - name: id
+          in: path
+          required: true
+          description: Identificador del evento.
+          schema:
+            type: string
+          example: "evt_101"
       responses:
-        "200":
+        '422':
+          description: Validation Error
+        '200':
+          description: Horarios y cartel devueltos con éxito.
           content:
             application/json:
               schema:
-                items:
-                  $ref: "#/components/schemas/ScheduleEntry"
                 type: array
-          description: Horarios y cartel devueltos con éxito.
-        "404":
+                items:
+                  $ref: '#/components/schemas/ScheduleEntry'
+        '404':
           description: El evento especificado no existe.
-      summary: Obtener el cartel (Line-up) y horarios del festival
-      tags:
-      - Line-up
     post:
-      description: |
+      tags:
+        - Line-up
+      summary: Añadir una actuación al line-up del evento
+      description: >
         Registra la actuación de un artista en un escenario y franja horaria.
-        Antes de crear la entrada, este microservicio realiza una COMUNICACIÓN SÍNCRONA de tipo CONSULTA:
+
+        Antes de crear la entrada, este microservicio realiza una COMUNICACIÓN SÍNCRONA
+        de tipo CONSULTA:
+
         Gestión de Eventos -> Catálogo Musical -> GET /artists/{artistId}
+
         para validar que el artista existe en el catálogo musical.
       operationId: addScheduleEntry
+      security:
+        - BearerAuth: []
       parameters:
-      - description: Identificador del evento al que se añade la actuación.
-        example: evt_101
-        explode: false
-        in: path
-        name: id
-        required: true
-        schema:
-          type: string
-        style: simple
+        - name: id
+          in: path
+          required: true
+          description: Identificador del evento al que se añade la actuación.
+          schema:
+            type: string
+          example: "evt_101"
       requestBody:
+        required: true
+        description: Datos del artista, escenario y horario.
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateScheduleEntryRequest"
-        description: "Datos del artista, escenario y horario."
-        required: true
+              $ref: '#/components/schemas/CreateScheduleEntryRequest'
       responses:
-        "201":
+        '422':
+          description: Validation Error
+        '201':
+          description: Actuación añadida al cartel correctamente.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ScheduleEntry"
-          description: Actuación añadida al cartel correctamente.
-        "400":
+                $ref: '#/components/schemas/ScheduleEntry'
+        '400':
           description: Solapamiento horario o datos incorrectos.
-        "401":
+        '401':
           description: No autenticado.
-        "403":
+        '403':
           description: Acceso denegado.
-        "404":
-          description: |
-            El evento o el artista no existen. Este error puede producirse si la consulta síncrona a Catálogo Musical devuelve un 404.
-        "503":
-          description: |
-            No se pudo validar el artista porque el microservicio de Catálogo Musical no se encuentra disponible.
-      security:
-      - BearerAuth: []
-      summary: Añadir una actuación al line-up del evento
-      tags:
-      - Line-up
+        '404':
+          description: >
+            El evento o el artista no existen. Este error puede producirse si la
+            consulta síncrona a Catálogo Musical devuelve un 404.
+        '503':
+          description: >
+            No se pudo validar el artista porque el microservicio de Catálogo Musical
+            no se encuentra disponible.
+
   /events/{id}/passes:
     get:
-      description: |
+      tags:
+        - Pases y Entradas
+      summary: Consultar los tipos de pases y aforo configurado
+      description: >
         Devuelve los tipos de entrada disponibles para el evento (general, VIP, abono).
       operationId: getPassConfigsByEvent
       parameters:
-      - description: Identificador del evento.
-        example: evt_101
-        explode: false
-        in: path
-        name: id
-        required: true
-        schema:
-          type: string
-        style: simple
+        - name: id
+          in: path
+          required: true
+          description: Identificador del evento.
+          schema:
+            type: string
+          example: "evt_101"
       responses:
-        "200":
+        '422':
+          description: Validation Error
+        '200':
+          description: Tipos de pases configurados.
           content:
             application/json:
               schema:
-                items:
-                  $ref: "#/components/schemas/PassConfig"
                 type: array
-          description: Tipos de pases configurados.
-        "404":
+                items:
+                  $ref: '#/components/schemas/PassConfig'
+        '404':
           description: Evento no encontrado.
-      summary: Consultar los tipos de pases y aforo configurado
-      tags:
-      - Pases y Entradas
     post:
-      description: |
+      tags:
+        - Pases y Entradas
+      summary: Configurar un nuevo tipo de pase para el evento
+      description: >
         Define precio, aforo máximo y beneficios de una modalidad de entrada. Operación para administradores.
       operationId: createPassConfig
+      security:
+        - BearerAuth: []
       parameters:
-      - description: Identificador del evento al que se asigna la entrada.
-        example: evt_101
-        explode: false
-        in: path
-        name: id
-        required: true
-        schema:
-          type: string
-        style: simple
+        - name: id
+          in: path
+          required: true
+          description: Identificador del evento al que se asigna la entrada.
+          schema:
+            type: string
+          example: "evt_101"
       requestBody:
+        required: true
+        description: Configuración del pase y aforo.
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreatePassConfigRequest"
-        description: Configuración del pase y aforo.
-        required: true
+              $ref: '#/components/schemas/CreatePassConfigRequest'
       responses:
-        "201":
+        '422':
+          description: Validation Error
+        '201':
+          description: Modalidad de pase dada de alta exitosamente.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PassConfig"
-          description: Modalidad de pase dada de alta exitosamente.
-        "401":
+                $ref: '#/components/schemas/PassConfig'
+        '401':
           description: No autenticado.
-        "403":
+        '403':
           description: Acceso denegado.
-      security:
-      - BearerAuth: []
-      summary: Configurar un nuevo tipo de pase para el evento
-      tags:
-      - Pases y Entradas
+
   /tickets/purchase:
     post:
-      description: |
+      tags:
+        - Pases y Entradas
+      summary: Comprar una entrada / pase para un evento
+      description: >
         Emite una entrada nominal y decrementa el aforo del pase.
-        Antes de emitir la entrada, este microservicio realiza una COMUNICACIÓN SÍNCRONA de tipo CONSULTA:
+
+        Antes de emitir la entrada, este microservicio realiza una COMUNICACIÓN SÍNCRONA
+        de tipo CONSULTA:
+
         Gestión de Eventos -> Autenticación y Cuentas -> GET /users/{userId}
+
         para validar la identidad del comprador y asociar la entrada a su propietario.
       operationId: purchaseTicket
+      security:
+        - BearerAuth: []
       requestBody:
+        required: true
+        description: Identificadores del evento, tipo de pase, usuario y token de pago.
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TicketPurchaseRequest"
-        description: "Identificadores del evento, tipo de pase, usuario y token de\
-          \ pago."
-        required: true
+              $ref: '#/components/schemas/TicketPurchaseRequest'
       responses:
-        "201":
+        '422':
+          description: Validation Error
+        '201':
+          description: Entrada emitida y asociada exitosamente al usuario.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Ticket"
-          description: Entrada emitida y asociada exitosamente al usuario.
-        "400":
+                $ref: '#/components/schemas/Ticket'
+        '400':
           description: Datos de compra incompletos.
-        "401":
+        '401':
           description: No autenticado.
-        "404":
-          description: |
-            El usuario indicado no existe según la consulta a Autenticación y Cuentas, o el tipo de pase seleccionado no existe.
-        "409":
-          description: Aforo máximo completado. No quedan entradas disponibles para
-            este pase.
-        "503":
-          description: |
-            No se pudo verificar la identidad del comprador porque el microservicio de Autenticación y Cuentas no está disponible.
-      security:
-      - BearerAuth: []
-      summary: Comprar una entrada / pase para un evento
-      tags:
-      - Pases y Entradas
+        '404':
+          description: >
+            El usuario indicado no existe según la consulta a Autenticación y Cuentas,
+            o el tipo de pase seleccionado no existe.
+        '409':
+          description: Aforo máximo completado. No quedan entradas disponibles para este pase.
+        '503':
+          description: >
+            No se pudo verificar la identidad del comprador porque el microservicio
+            de Autenticación y Cuentas no está disponible.
+
   /tickets/user/{userId}:
     get:
-      description: |
+      tags:
+        - Pases y Entradas
+      summary: Consultar las entradas adquiridas por un usuario
+      description: >
         Devuelve el listado de entradas emitidas asociadas al identificador del comprador.
       operationId: getTicketsByUser
+      security:
+        - BearerAuth: []
       parameters:
-      - description: Identificador del usuario propietario de las entradas.
-        example: usr_555
-        explode: false
-        in: path
-        name: userId
-        required: true
-        schema:
-          type: string
-        style: simple
+        - name: userId
+          in: path
+          required: true
+          description: Identificador del usuario propietario de las entradas.
+          schema:
+            type: string
+          example: "usr_555"
       responses:
-        "200":
+        '422':
+          description: Validation Error
+        '200':
+          description: Entradas del usuario.
           content:
             application/json:
               schema:
-                items:
-                  $ref: "#/components/schemas/Ticket"
                 type: array
-          description: Entradas del usuario.
-        "401":
+                items:
+                  $ref: '#/components/schemas/Ticket'
+        '401':
           description: No autenticado.
-        "403":
+        '403':
           description: Acceso denegado. No se pueden consultar entradas de otro usuario.
-      security:
-      - BearerAuth: []
-      summary: Consultar las entradas adquiridas por un usuario
-      tags:
-      - Pases y Entradas
+
 components:
-  schemas:
-    CreateEventRequest:
-      example:
-        name: Subsonic Summer Edition
-        start_date: 2027-07-20
-        end_date: 2027-07-22
-        venue: Recinto Ferial IFEMA
-        location_city: Madrid
-      properties:
-        name:
-          description: Nombre oficial de la edición del festival.
-          example: Subsonic Summer Edition
-          title: name
-          type: string
-        start_date:
-          description: Fecha de inicio del festival.
-          example: 2027-07-20
-          format: date
-          title: start_date
-          type: string
-        end_date:
-          description: Fecha de finalización del festival.
-          example: 2027-07-22
-          format: date
-          title: end_date
-          type: string
-        venue:
-          description: Nombre del recinto o complejo.
-          example: Recinto Ferial IFEMA
-          title: venue
-          type: string
-        location_city:
-          description: Ciudad de celebración.
-          example: Madrid
-          title: location_city
-          type: string
-      required:
-      - end_date
-      - location_city
-      - name
-      - start_date
-      - venue
-      title: CreateEventRequest
-      type: object
-    Event:
-      example:
-        id: evt_101
-        name: Subsonic Summer Edition
-        start_date: 2027-07-20
-        end_date: 2027-07-22
-        venue: Recinto Ferial IFEMA
-        location_city: Madrid
-      properties:
-        id:
-          description: Identificador único del festival en este microservicio.
-          example: evt_101
-          title: id
-          type: string
-        name:
-          description: Nombre de la edición.
-          example: Subsonic Summer Edition
-          title: name
-          type: string
-        start_date:
-          description: Fecha de inicio.
-          example: 2027-07-20
-          format: date
-          title: start_date
-          type: string
-        end_date:
-          description: Fecha de cierre.
-          example: 2027-07-22
-          format: date
-          title: end_date
-          type: string
-        venue:
-          description: Recinto o recinto ferial.
-          example: Recinto Ferial IFEMA
-          title: venue
-          type: string
-        location_city:
-          description: Ciudad donde se ubica el festival.
-          example: Madrid
-          title: location_city
-          type: string
-      required:
-      - end_date
-      - id
-      - location_city
-      - name
-      - start_date
-      - venue
-      title: Event
-      type: object
-    CreateScheduleEntryRequest:
-      example:
-        artist_id: art_12345
-        artist_name: Daft Punk
-        stage: Main Stage
-        start_time: 2027-07-20T22:00:00Z
-        end_time: 2027-07-20T23:30:00Z
-      properties:
-        artist_id:
-          description: |
-            Identificador del artista. El dato pertenece al microservicio de Catálogo Musical y se utiliza como referencia foránea.
-          example: art_12345
-          title: artist_id
-          type: string
-        artist_name:
-          description: Nombre del artista para visualización rápida.
-          example: Daft Punk
-          title: artist_name
-          type: string
-        stage:
-          description: Nombre del escenario dentro del recinto.
-          example: Main Stage
-          title: stage
-          type: string
-        start_time:
-          description: Fecha y hora exacta de inicio de la actuación.
-          example: 2027-07-20T22:00:00Z
-          format: date-time
-          title: start_time
-          type: string
-        end_time:
-          description: Fecha y hora estimada de finalización.
-          example: 2027-07-20T23:30:00Z
-          format: date-time
-          title: end_time
-          type: string
-      required:
-      - artist_id
-      - end_time
-      - stage
-      - start_time
-      title: CreateScheduleEntryRequest
-      type: object
-    ScheduleEntry:
-      example:
-        id: sch_001
-        artist_id: art_12345
-        artist_name: Daft Punk
-        stage: Main Stage
-        start_time: 2027-07-20T22:00:00Z
-        end_time: 2027-07-20T23:30:00Z
-      properties:
-        id:
-          description: Identificador de la franja horaria en el line-up.
-          example: sch_001
-          title: id
-          type: string
-        artist_id:
-          description: Referencia foránea hacia el artista en Catálogo Musical.
-          example: art_12345
-          title: artist_id
-          type: string
-        artist_name:
-          description: Nombre del artista.
-          example: Daft Punk
-          title: artist_name
-          type: string
-        stage:
-          description: Escenario asignado.
-          example: Main Stage
-          title: stage
-          type: string
-        start_time:
-          description: Inicio de la presentación.
-          example: 2027-07-20T22:00:00Z
-          format: date-time
-          title: start_time
-          type: string
-        end_time:
-          description: Fin de la presentación.
-          example: 2027-07-20T23:30:00Z
-          format: date-time
-          title: end_time
-          type: string
-      required:
-      - artist_id
-      - end_time
-      - id
-      - stage
-      - start_time
-      title: ScheduleEntry
-      type: object
-    CreatePassConfigRequest:
-      example:
-        type_name: Abono VIP 3 Días
-        price: 150.0
-        capacity: 5000
-        benefits:
-        - Acceso Front Stage
-        - Barra libre
-      properties:
-        type_name:
-          description: Nombre comercial del tipo de pase (ej. Abono VIP 3 Días).
-          example: Abono VIP 3 Días
-          title: type_name
-          type: string
-        price:
-          description: Precio unitario de la entrada en euros.
-          example: 150.0
-          format: float
-          title: price
-          type: number
-        capacity:
-          description: Aforo total reservado para este tipo de pase.
-          example: 5000
-          title: capacity
-          type: integer
-        benefits:
-          description: Ventajas asociadas al pase.
-          example:
-          - Acceso Front Stage
-          - Barra libre
-          items:
-            type: string
-          title: benefits
-          type: array
-      required:
-      - capacity
-      - price
-      - type_name
-      title: CreatePassConfigRequest
-      type: object
-    PassConfig:
-      example:
-        id: pass_001
-        event_id: evt_101
-        type_name: Abono VIP 3 Días
-        price: 150.0
-        capacity: 5000
-        available_tickets: 4890
-        benefits:
-        - Acceso Front Stage
-        - Barra libre
-      properties:
-        id:
-          description: Identificador único del tipo de pase.
-          example: pass_001
-          title: id
-          type: string
-        event_id:
-          description: Identificador del festival al que pertenece el pase.
-          example: evt_101
-          title: event_id
-          type: string
-        type_name:
-          description: Nombre de la modalidad de entrada.
-          example: Abono VIP 3 Días
-          title: type_name
-          type: string
-        price:
-          description: Coste en euros.
-          example: 150.0
-          format: float
-          title: price
-          type: number
-        capacity:
-          description: Aforo total.
-          example: 5000
-          title: capacity
-          type: integer
-        available_tickets:
-          description: Entradas restantes disponibles para venta.
-          example: 4890
-          title: available_tickets
-          type: integer
-        benefits:
-          description: Beneficios incluidos.
-          example:
-          - Acceso Front Stage
-          - Barra libre
-          items:
-            type: string
-          title: benefits
-          type: array
-      required:
-      - available_tickets
-      - capacity
-      - event_id
-      - id
-      - price
-      - type_name
-      title: PassConfig
-      type: object
-    TicketPurchaseRequest:
-      example:
-        event_id: evt_101
-        pass_id: pass_001
-        user_id: usr_555
-        payment_token: tok_visa_4242
-      properties:
-        event_id:
-          description: Identificador del evento para el que se adquiere la entrada.
-          example: evt_101
-          title: event_id
-          type: string
-        pass_id:
-          description: Identificador del tipo de pase seleccionado.
-          example: pass_001
-          title: pass_id
-          type: string
-        user_id:
-          description: |
-            Identificador del usuario comprador. Pertenece al microservicio de Autenticación y Cuentas y se utiliza para asociar la propiedad de la entrada.
-          example: usr_555
-          title: user_id
-          type: string
-        payment_token:
-          description: Token de pasarela de pago para confirmar la transacción.
-          example: tok_visa_4242
-          title: payment_token
-          type: string
-      required:
-      - event_id
-      - pass_id
-      - user_id
-      title: TicketPurchaseRequest
-      type: object
-    Ticket:
-      example:
-        id: tck_9901
-        event_id: evt_101
-        pass_id: pass_001
-        user_id: usr_555
-        qr_code: SUBSONIC-TCK-9901-SECURE
-        status: valid
-        purchased_at: 2027-01-15T10:00:00Z
-      properties:
-        id:
-          description: Identificador único de la entrada emitida.
-          example: tck_9901
-          title: id
-          type: string
-        event_id:
-          description: Evento asociado.
-          example: evt_101
-          title: event_id
-          type: string
-        pass_id:
-          description: Tipo de pase emitido.
-          example: pass_001
-          title: pass_id
-          type: string
-        user_id:
-          description: Identificador del usuario propietario de la entrada (Autenticación
-            y Cuentas).
-          example: usr_555
-          title: user_id
-          type: string
-        qr_code:
-          description: Código seguro para el control de acceso en recinto.
-          example: SUBSONIC-TCK-9901-SECURE
-          title: qr_code
-          type: string
-        status:
-          description: Estado de validez de la entrada.
-          enum:
-          - valid
-          - used
-          - cancelled
-          example: valid
-          title: status
-          type: string
-        purchased_at:
-          description: Fecha y hora exacta de compra.
-          example: 2027-01-15T10:00:00Z
-          format: date-time
-          title: purchased_at
-          type: string
-      required:
-      - event_id
-      - id
-      - pass_id
-      - purchased_at
-      - qr_code
-      - status
-      - user_id
-      title: Ticket
-      type: object
   securitySchemes:
     BearerAuth:
-      bearerFormat: JWT
-      scheme: bearer
       type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    CreateEventRequest:
+      type: object
+      required:
+        - name
+        - start_date
+        - end_date
+        - venue
+        - location_city
+      properties:
+        name:
+          type: string
+          description: Nombre oficial de la edición del festival.
+          example: "Subsonic Summer Edition"
+        start_date:
+          type: string
+          format: date
+          description: Fecha de inicio del festival.
+          example: "2027-07-20"
+        end_date:
+          type: string
+          format: date
+          description: Fecha de finalización del festival.
+          example: "2027-07-22"
+        venue:
+          type: string
+          description: Nombre del recinto o complejo.
+          example: "Recinto Ferial IFEMA"
+        location_city:
+          type: string
+          description: Ciudad de celebración.
+          example: "Madrid"
+
+    Event:
+      type: object
+      required:
+        - id
+        - name
+        - start_date
+        - end_date
+        - venue
+        - location_city
+      properties:
+        id:
+          type: string
+          description: Identificador único del festival en este microservicio.
+          example: "evt_101"
+        name:
+          type: string
+          description: Nombre de la edición.
+          example: "Subsonic Summer Edition"
+        start_date:
+          type: string
+          format: date
+          description: Fecha de inicio.
+          example: "2027-07-20"
+        end_date:
+          type: string
+          format: date
+          description: Fecha de cierre.
+          example: "2027-07-22"
+        venue:
+          type: string
+          description: Recinto o recinto ferial.
+          example: "Recinto Ferial IFEMA"
+        location_city:
+          type: string
+          description: Ciudad donde se ubica el festival.
+          example: "Madrid"
+
+    CreateScheduleEntryRequest:
+      type: object
+      required:
+        - artist_id
+        - stage
+        - start_time
+        - end_time
+      properties:
+        artist_id:
+          type: string
+          description: >
+            Identificador del artista. El dato pertenece al microservicio
+            de Catálogo Musical y se utiliza como referencia foránea.
+          example: "art_12345"
+        artist_name:
+          type: string
+          description: Nombre del artista para visualización rápida.
+          example: "Daft Punk"
+        stage:
+          type: string
+          description: Nombre del escenario dentro del recinto.
+          example: "Main Stage"
+        start_time:
+          type: string
+          format: date-time
+          description: Fecha y hora exacta de inicio de la actuación.
+          example: "2027-07-20T22:00:00Z"
+        end_time:
+          type: string
+          format: date-time
+          description: Fecha y hora estimada de finalización.
+          example: "2027-07-20T23:30:00Z"
+
+    ScheduleEntry:
+      type: object
+      required:
+        - id
+        - artist_id
+        - stage
+        - start_time
+        - end_time
+      properties:
+        id:
+          type: string
+          description: Identificador de la franja horaria en el line-up.
+          example: "sch_001"
+        artist_id:
+          type: string
+          description: Referencia foránea hacia el artista en Catálogo Musical.
+          example: "art_12345"
+        artist_name:
+          type: string
+          description: Nombre del artista.
+          example: "Daft Punk"
+        stage:
+          type: string
+          description: Escenario asignado.
+          example: "Main Stage"
+        start_time:
+          type: string
+          format: date-time
+          description: Inicio de la presentación.
+          example: "2027-07-20T22:00:00Z"
+        end_time:
+          type: string
+          format: date-time
+          description: Fin de la presentación.
+          example: "2027-07-20T23:30:00Z"
+
+    CreatePassConfigRequest:
+      type: object
+      required:
+        - type_name
+        - price
+        - capacity
+      properties:
+        type_name:
+          type: string
+          description: Nombre comercial del tipo de pase (ej. Abono VIP 3 Días).
+          example: "Abono VIP 3 Días"
+        price:
+          type: number
+          format: float
+          description: Precio unitario de la entrada en euros.
+          example: 150.00
+        capacity:
+          type: integer
+          description: Aforo total reservado para este tipo de pase.
+          example: 5000
+        benefits:
+          type: array
+          description: Ventajas asociadas al pase.
+          items:
+            type: string
+          example: ["Acceso Front Stage", "Barra libre"]
+
+    PassConfig:
+      type: object
+      required:
+        - id
+        - event_id
+        - type_name
+        - price
+        - capacity
+        - available_tickets
+      properties:
+        id:
+          type: string
+          description: Identificador único del tipo de pase.
+          example: "pass_001"
+        event_id:
+          type: string
+          description: Identificador del festival al que pertenece el pase.
+          example: "evt_101"
+        type_name:
+          type: string
+          description: Nombre de la modalidad de entrada.
+          example: "Abono VIP 3 Días"
+        price:
+          type: number
+          format: float
+          description: Coste en euros.
+          example: 150.00
+        capacity:
+          type: integer
+          description: Aforo total.
+          example: 5000
+        available_tickets:
+          type: integer
+          description: Entradas restantes disponibles para venta.
+          example: 4890
+        benefits:
+          type: array
+          description: Beneficios incluidos.
+          items:
+            type: string
+          example: ["Acceso Front Stage", "Barra libre"]
+
+    TicketPurchaseRequest:
+      type: object
+      required:
+        - event_id
+        - pass_id
+        - user_id
+      properties:
+        event_id:
+          type: string
+          description: Identificador del evento para el que se adquiere la entrada.
+          example: "evt_101"
+        pass_id:
+          type: string
+          description: Identificador del tipo de pase seleccionado.
+          example: "pass_001"
+        user_id:
+          type: string
+          description: >
+            Identificador del usuario comprador. Pertenece al microservicio de
+            Autenticación y Cuentas y se utiliza para asociar la propiedad de la entrada.
+          example: "usr_555"
+        payment_token:
+          type: string
+          description: Token de pasarela de pago para confirmar la transacción.
+          example: "tok_visa_4242"
+
+    Ticket:
+      type: object
+      required:
+        - id
+        - event_id
+        - pass_id
+        - user_id
+        - qr_code
+        - status
+        - purchased_at
+      properties:
+        id:
+          type: string
+          description: Identificador único de la entrada emitida.
+          example: "tck_9901"
+        event_id:
+          type: string
+          description: Evento asociado.
+          example: "evt_101"
+        pass_id:
+          type: string
+          description: Tipo de pase emitido.
+          example: "pass_001"
+        user_id:
+          type: string
+          description: Identificador del usuario propietario de la entrada (Autenticación y Cuentas).
+          example: "usr_555"
+        qr_code:
+          type: string
+          description: Código seguro para el control de acceso en recinto.
+          example: "SUBSONIC-TCK-9901-SECURE"
+        status:
+          type: string
+          enum: [valid, used, cancelled]
+          description: Estado de validez de la entrada.
+          example: "valid"
+        purchased_at:
+          type: string
+          format: date-time
+          description: Fecha y hora exacta de compra.
+          example: "2027-01-15T10:00:00Z"

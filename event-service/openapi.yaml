@@ -63,6 +63,8 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateEventRequest'
       responses:
+        '422':
+          description: Validation Error
         '201':
           description: Evento registrado exitosamente.
           content:
@@ -94,6 +96,8 @@ paths:
             type: string
           example: "evt_101"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Detalles del evento.
           content:
@@ -127,6 +131,8 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateEventRequest'
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Evento actualizado correctamente.
           content:
@@ -157,6 +163,8 @@ paths:
             type: string
           example: "evt_101"
       responses:
+        '422':
+          description: Validation Error
         '204':
           description: Evento eliminado satisfactoriamente.
         '401':
@@ -183,6 +191,8 @@ paths:
             type: string
           example: "evt_101"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Horarios y cartel devueltos con éxito.
           content:
@@ -225,6 +235,8 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateScheduleEntryRequest'
       responses:
+        '422':
+          description: Validation Error
         '201':
           description: Actuación añadida al cartel correctamente.
           content:
@@ -263,6 +275,8 @@ paths:
             type: string
           example: "evt_101"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Tipos de pases configurados.
           content:
@@ -298,6 +312,8 @@ paths:
             schema:
               $ref: '#/components/schemas/CreatePassConfigRequest'
       responses:
+        '422':
+          description: Validation Error
         '201':
           description: Modalidad de pase dada de alta exitosamente.
           content:
@@ -334,6 +350,8 @@ paths:
             schema:
               $ref: '#/components/schemas/TicketPurchaseRequest'
       responses:
+        '422':
+          description: Validation Error
         '201':
           description: Entrada emitida y asociada exitosamente al usuario.
           content:
@@ -374,6 +392,8 @@ paths:
             type: string
           example: "usr_555"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Entradas del usuario.
           content:

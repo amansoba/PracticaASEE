@@ -41,6 +41,8 @@ paths:
             schema:
               $ref: '#/components/schemas/RegisterRequest'
       responses:
+        '422':
+          description: Validation Error
         '201':
           description: Usuario registrado exitosamente.
           content:
@@ -67,6 +69,8 @@ paths:
             schema:
               $ref: '#/components/schemas/LoginRequest'
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Autenticación exitosa. Devuelve el token de acceso.
           content:
@@ -87,6 +91,8 @@ paths:
       security:
         - BearerAuth: []
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Sesión cerrada correctamente.
         '401':
@@ -116,8 +122,37 @@ paths:
                   description: Correo electrónico de la cuenta a recuperar.
                   example: "usuario@email.com"
       responses:
+        '422':
+          description: Validation Error
+        '503':
+          description: Servicio de correo no disponible.
         '200':
           description: Correo de recuperación enviado si la cuenta existe.
+
+  /auth/reset-password/confirm:
+    post:
+      tags:
+        - Autenticación
+      summary: Confirmar recuperación de contraseña
+      description: |
+        Confirma el restablecimiento de contraseña mediante un token
+        temporal recibido por correo. El token solo puede usarse una
+        vez y caduca a los 15 minutos.
+      operationId: confirmPasswordReset
+      requestBody:
+        required: true
+        description: Token de recuperación y nueva contraseña.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmPasswordResetRequest"
+      responses:
+        '422':
+          description: Validation Error
+        "200":
+          description: Contraseña actualizada correctamente.
+        "400":
+          description: Token inválido, caducado o ya utilizado, o contraseña no válida.
 
   /users/me:
     get:
@@ -155,6 +190,8 @@ paths:
             schema:
               $ref: '#/components/schemas/UpdateProfileRequest'
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Perfil actualizado correctamente.
           content:
@@ -210,6 +247,8 @@ paths:
             type: string
           example: "usr_555"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Usuario encontrado.
           content:
@@ -255,6 +294,8 @@ paths:
                   description: Rol de acceso en el sistema.
                   example: "provider"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Rol modificado correctamente.
         '401':
@@ -272,6 +313,22 @@ components:
       bearerFormat: JWT
 
   schemas:
+    ConfirmPasswordResetRequest:
+      type: object
+      description: Datos necesarios para confirmar la recuperación de contraseña.
+      required:
+      - token
+      - new_password
+      properties:
+        token:
+          type: string
+          minLength: 1
+          description: Token de recuperación recibido por correo.
+        new_password:
+          type: string
+          format: password
+          minLength: 8
+          description: Nueva contraseña del usuario.
     RegisterRequest:
       type: object
       required:

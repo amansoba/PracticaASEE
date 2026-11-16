@@ -47,6 +47,8 @@ paths:
             type: string
           example: "Daft"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Lista de artistas devuelta correctamente.
           content:
@@ -72,6 +74,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateArtistRequest'
       responses:
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '201':
           description: Artista creado exitosamente.
           content:
@@ -103,6 +109,8 @@ paths:
             type: string
           example: "art_12345"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Artista encontrado.
           content:
@@ -136,6 +144,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateArtistRequest'
       responses:
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '200':
           description: Artista actualizado correctamente.
           content:
@@ -166,6 +178,10 @@ paths:
             type: string
           example: "art_12345"
       responses:
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '204':
           description: Artista eliminado satisfactoriamente.
         '401':
@@ -192,6 +208,8 @@ paths:
             type: string
           example: "art_12345"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Lista de canciones del artista.
           content:
@@ -227,6 +245,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateSongRequest'
       responses:
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '201':
           description: Canción creada y vinculada correctamente.
           content:

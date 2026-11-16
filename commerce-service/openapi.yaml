@@ -39,6 +39,8 @@ paths:
             type: string
           example: "ropa"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Lista de productos devuelta con éxito.
           content:
@@ -65,6 +67,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateProductRequest'
       responses:
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '201':
           description: Producto dado de alta satisfactoriamente.
           content:
@@ -95,6 +101,8 @@ paths:
             type: string
           example: "prod_001"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Producto encontrado.
           content:
@@ -128,6 +136,12 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateProductRequest'
       responses:
+        '400':
+          description: Datos invalidos
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '200':
           description: Producto actualizado correctamente.
           content:
@@ -158,6 +172,10 @@ paths:
             type: string
           example: "prod_001"
       responses:
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '204':
           description: Producto eliminado exitosamente.
         '401':
@@ -192,6 +210,10 @@ paths:
             schema:
               $ref: '#/components/schemas/OrderRequest'
       responses:
+        '403':
+          description: Comprador no autorizado
+        '422':
+          description: Validation Error
         '201':
           description: Pedido registrado exitosamente.
           content:
@@ -232,6 +254,8 @@ paths:
             type: string
           example: "usr_555"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Historial de pedidos devuelto correctamente.
           content:
@@ -264,6 +288,10 @@ paths:
             type: string
           example: "ord_112233"
       responses:
+        '403':
+          description: No autorizado
+        '422':
+          description: Validation Error
         '200':
           description: Detalle del pedido.
           content:
@@ -310,6 +338,12 @@ paths:
                   description: Estado de preparación o envío.
                   example: "shipped"
       responses:
+        '400':
+          description: Estado incorrecto
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '200':
           description: Estado del pedido modificado correctamente.
         '401':
