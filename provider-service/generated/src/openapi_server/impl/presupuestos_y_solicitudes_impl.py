@@ -426,14 +426,33 @@ class PresupuestosYSolicitudesApiImpl(
                             )
                         )
 
+                    # Aprobar la propuesta seleccionada.
                     propuesta.status = "approved"
 
                     # Reservar el espacio adjudicado.
                     espacio.is_available = False
 
+                    # Rechazar automaticamente todas las
+                    # propuestas pendientes competidoras
+                    # para este mismo espacio.
+                    competidoras = db.scalars(
+                        select(SpaceProposalDB)
+                        .where(
+                            SpaceProposalDB.space_id == espacio.id,
+                            SpaceProposalDB.id != propuesta.id,
+                            SpaceProposalDB.status == "pending"
+                        )
+                        .with_for_update()
+                    ).all()
+
+                    for competidora in competidoras:
+                        competidora.status = "rejected"
+
                 else:
                     propuesta.status = "rejected"
 
+                # Aprobar, reservar y rechazar competidoras
+                # se guarda en una unica transaccion.
                 db.commit()
 
                 return None
