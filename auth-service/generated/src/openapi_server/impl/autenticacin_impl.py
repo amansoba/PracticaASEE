@@ -9,7 +9,6 @@ from sqlalchemy.exc import IntegrityError
 from openapi_server.apis.autenticacin_api_base import (
     BaseAutenticacinApi
 )
-
 from openapi_server.models.auth_response import AuthResponse
 from openapi_server.models.login_request import LoginRequest
 from openapi_server.models.register_request import RegisterRequest
@@ -33,17 +32,28 @@ from openapi_server.auth_flows import (
     solicitar_recuperacion
 )
 
+from openapi_server.login_rate_limit import (
+    comprobar_limite_login,
+    registrar_intento_fallido,
+    reiniciar_intentos_login
+)
+
 
 class AutenticacinApiImpl(BaseAutenticacinApi):
 
-    # POST /auth/register
-    # Registrar un nuevo usuario
+    # ========================================================
+    # REGISTRO
+    # ========================================================
+
     async def register_user(
         self,
         register_request: RegisterRequest
     ) -> UserProfile:
 
-        email = str(register_request.email).strip().lower()
+        email = str(
+            register_request.email
+        ).strip().lower()
+
         nombre = register_request.name.strip()
         password = register_request.password
 
@@ -65,25 +75,29 @@ class AutenticacinApiImpl(BaseAutenticacinApi):
         if len(password) < 8:
             raise HTTPException(
                 status_code=400,
-                detail="La contrasena debe tener al menos 8 caracteres"
+                detail=(
+                    "La contrasena debe tener "
+                    "al menos 8 caracteres"
+                )
             )
 
         with SessionLocal() as db:
 
-            # Comprobar si el correo ya esta registrado
-            usuario_existente = db.scalar(
+            existente = db.scalar(
                 select(UserDB).where(
                     UserDB.email == email
                 )
             )
 
-            if usuario_existente is not None:
+            if existente is not None:
                 raise HTTPException(
                     status_code=400,
-                    detail="El correo electronico ya esta registrado"
+                    detail=(
+                        "El correo electronico "
+                        "ya esta registrado"
+                    )
                 )
 
-            # Crear el usuario con rol client
             nuevo_usuario = UserDB(
                 id=f"usr_{uuid4().hex}",
                 name=nombre,
@@ -104,7 +118,10 @@ class AutenticacinApiImpl(BaseAutenticacinApi):
 
                 raise HTTPException(
                     status_code=400,
-                    detail="El correo electronico ya esta registrado"
+                    detail=(
+                        "El correo electronico "
+                        "ya esta registrado"
+                    )
                 )
 
             return UserProfile(
@@ -116,46 +133,57 @@ class AutenticacinApiImpl(BaseAutenticacinApi):
                 avatar_url=nuevo_usuario.avatar_url
             )
 
-    # POST /auth/login
-    # Autenticar al usuario y generar un JWT
+    # ========================================================
+    # LOGIN CON LIMITE DE INTENTOS
+    # ========================================================
+
     async def login_user(
         self,
         login_request: LoginRequest
     ) -> AuthResponse:
 
-        email = str(login_request.email).strip().lower()
+        email = str(
+            login_request.email
+        ).strip().lower()
+
         password = login_request.password
 
         if isinstance(password, SecretStr):
             password = password.get_secret_value()
 
+        # Comprobar si el usuario esta temporalmente
+        # bloqueado por intentos fallidos.
+        comprobar_limite_login(email)
+
         with SessionLocal() as db:
 
-            # Buscar al usuario por correo
             usuario = db.scalar(
                 select(UserDB).where(
                     UserDB.email == email
                 )
             )
 
-            # No revelar si el correo existe o no
-            if usuario is None:
-                raise HTTPException(
-                    status_code=401,
-                    detail="Correo o contrasena incorrectos"
+            # Mensaje identico para usuarios inexistentes
+            # y contrasenas incorrectas.
+            if (
+                usuario is None
+                or not verificar_password(
+                    password,
+                    usuario.password_hash
                 )
-
-            # Comprobar el hash Argon2
-            if not verificar_password(
-                password,
-                usuario.password_hash
             ):
+                registrar_intento_fallido(email)
+
                 raise HTTPException(
                     status_code=401,
-                    detail="Correo o contrasena incorrectos"
+                    detail=(
+                        "Correo o contrasena incorrectos"
+                    )
                 )
 
-            # Generar token firmado con el ID y rol
+            # Un login correcto limpia los fallos.
+            reiniciar_intentos_login(email)
+
             token = crear_token(
                 user_id=usuario.id,
                 role=usuario.role
@@ -177,34 +205,26 @@ class AutenticacinApiImpl(BaseAutenticacinApi):
                 user=perfil
             )
 
-    # POST /auth/logout
-    # Pendiente de implementar revocacion de tokens
-    async def logout_user(
-        self
-    ) -> None:
+    # ========================================================
+    # CIERRE DE SESION
+    # ========================================================
 
-        raise HTTPException(
-            status_code=501,
-            detail="Cierre de sesion pendiente de implementar"
-        )
-
-    
-    # POST /auth/logout
-    # Revocar el JWT utilizado para cerrar la sesion
     async def logout_user(
         self,
         token: str
     ) -> None:
 
         cerrar_sesion(token)
-
         return None
 
-    # POST /auth/reset-password
-    # Solicitar un enlace para recuperar la contrasena
+    # ========================================================
+    # RECUPERACION DE CONTRASENA
+    # ========================================================
+
     async def request_password_reset(
         self,
-        request_password_reset_request: RequestPasswordResetRequest
+        request_password_reset_request:
+        RequestPasswordResetRequest
     ) -> None:
 
         email = str(
