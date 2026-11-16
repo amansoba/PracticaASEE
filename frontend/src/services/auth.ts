@@ -1,3 +1,4 @@
+import { api } from "./api";
 
 export interface Usuario {
   id: string;
@@ -15,44 +16,6 @@ export interface RespuestaLogin {
   user: Usuario;
 }
 
-export async function iniciarSesion(
-  email: string,
-  password: string
-): Promise<RespuestaLogin> {
-  const respuesta = await fetch("/api/auth/auth/login", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ email, password }),
-  });
-
-  if (!respuesta.ok) {
-    if (respuesta.status === 401) {
-      throw new Error("Correo electrónico o contraseña incorrectos");
-    }
-
-    throw new Error("No se pudo iniciar sesión");
-  }
-
-  return respuesta.json();
-}
-
-
-export async function finalizarSesion(token: string): Promise<void> {
-  const respuesta = await fetch("/api/auth/auth/logout", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!respuesta.ok) {
-    throw new Error("No se pudo cerrar la sesión en el servidor");
-  }
-}
-
-
 export interface DatosRegistro {
   name: string;
   email: string;
@@ -60,24 +23,34 @@ export interface DatosRegistro {
   phone?: string;
 }
 
+export async function iniciarSesion(
+  email: string,
+  password: string
+): Promise<RespuestaLogin> {
+  return api.post("/api/auth/auth/login", { email, password });
+}
+
+export async function finalizarSesion(): Promise<void> {
+  return api.post("/api/auth/auth/logout", {});
+}
+
 export async function registrarUsuario(
   datos: DatosRegistro
 ): Promise<Usuario> {
-  const respuesta = await fetch("/api/auth/auth/register", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(datos),
-  });
+  return api.post("/api/auth/auth/register", datos);
+}
 
-  if (!respuesta.ok) {
-    if (respuesta.status === 400) {
-      throw new Error("Datos inválidos o correo electrónico ya registrado");
-    }
+export async function solicitarRecuperacion(email: string): Promise<void> {
+  return api.post("/api/auth/auth/reset-password", { email });
+}
 
-    throw new Error("No se pudo registrar el usuario");
-  }
+export interface DatosConfirmarRecuperacion {
+  token: string;
+  new_password: string;
+}
 
-  return respuesta.json();
+export async function confirmarRecuperacion(
+  datos: DatosConfirmarRecuperacion
+): Promise<void> {
+  return api.post("/api/auth/auth/reset-password/confirm", datos);
 }

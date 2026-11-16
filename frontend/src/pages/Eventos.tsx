@@ -1,5 +1,5 @@
-
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { obtenerEventos, type Evento } from "../services/eventos";
 
 function Eventos() {
@@ -31,7 +31,11 @@ function Eventos() {
 
       <div className="eventos-grid">
         {eventos.map((evento) => (
-          <article className="evento-card" key={evento.id}>
+          <Link
+            to={`/eventos/${evento.id}`}
+            className="evento-card"
+            key={evento.id}
+          >
             <div className="evento-card-contenido">
               <span className="evento-etiqueta">FESTIVAL</span>
 
@@ -41,7 +45,7 @@ function Eventos() {
               <p>🏟️ {evento.venue}</p>
               <p>📅 {evento.start_date} — {evento.end_date}</p>
             </div>
-          </article>
+          </Link>
         ))}
       </div>
     </main>

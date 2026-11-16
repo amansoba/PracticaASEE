@@ -1,3 +1,4 @@
+import { api } from "./api";
 
 export interface Artista {
   id: string;
@@ -8,11 +9,9 @@ export interface Artista {
 }
 
 export async function obtenerArtistas(): Promise<Artista[]> {
-  const respuesta = await fetch("/api/catalogo/artists");
+  return api.get("/api/catalogo/artists");
+}
 
-  if (!respuesta.ok) {
-    throw new Error("No se pudieron cargar los artistas");
-  }
-
-  return respuesta.json();
+export async function obtenerArtista(id: string): Promise<Artista> {
+  return api.get(`/api/catalogo/artists/${encodeURIComponent(id)}`);
 }
