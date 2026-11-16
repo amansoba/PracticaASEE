@@ -1,4 +1,5 @@
 
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import uuid4
 
@@ -44,6 +45,9 @@ TRANSICIONES = {
     "delivered": set(),
     "cancelled": set()
 }
+
+# Tiempo maximo de reserva de stock sin pagar.
+MINUTOS_EXPIRACION = 30
 
 
 # ============================================================
@@ -220,6 +224,87 @@ def devolver_stock(db, pedido: OrderDB):
     # Reponer el inventario.
     for clave, cantidad in cantidades.items():
         variantes_por_clave[clave].stock += cantidad
+
+
+# ============================================================
+# EXPIRACION DE PEDIDOS PENDIENTES
+# ============================================================
+
+def expirar_pedidos_pendientes() -> int:
+    """
+    Cancela los pedidos pendientes que hayan superado
+    el tiempo maximo de reserva.
+
+    Devuelve el numero de pedidos cancelados.
+
+    Cada pedido se procesa en su propia transaccion,
+    bloqueando su fila antes de modificar el inventario.
+    """
+
+    fecha_limite = (
+        datetime.now(timezone.utc)
+        - timedelta(minutes=MINUTOS_EXPIRACION)
+    )
+
+    # Buscar los identificadores de los pedidos caducados.
+    # No mantenemos bloqueados todos los pedidos a la vez.
+    with SessionLocal() as db:
+        pedidos_ids = db.scalars(
+            select(OrderDB.id)
+            .where(
+                OrderDB.status == "pending",
+                OrderDB.created_at <= fecha_limite
+            )
+            .order_by(OrderDB.id)
+        ).all()
+
+    total_expirados = 0
+
+    for pedido_id in pedidos_ids:
+
+        with SessionLocal() as db:
+            try:
+                # Bloquear el pedido antes de cancelarlo.
+                # Esto coordina la caducidad con pagos
+                # y cancelaciones simultaneas.
+                pedido = db.scalar(
+                    select(OrderDB)
+                    .where(OrderDB.id == pedido_id)
+                    .with_for_update()
+                )
+
+                if pedido is None:
+                    continue
+
+                # Volver a comprobar el estado porque
+                # otro proceso podria haber pagado o
+                # cancelado el pedido mientras esperabamos.
+                if pedido.status != "pending":
+                    continue
+
+                # Comprobar tambien que sigue caducado.
+                if pedido.created_at > fecha_limite:
+                    continue
+
+                # Cargar los articulos del pedido.
+                _ = pedido.items
+
+                # Devolver el stock reservado.
+                devolver_stock(db, pedido)
+
+                # Cancelar el pedido dentro de la misma
+                # transaccion que repone el inventario.
+                pedido.status = "cancelled"
+
+                db.commit()
+
+                total_expirados += 1
+
+            except Exception:
+                db.rollback()
+                raise
+
+    return total_expirados
 
 
 # ============================================================
@@ -607,7 +692,7 @@ class PedidosApiImpl(BasePedidosApi):
                         detail="Pago simulado rechazado"
                     )
 
-                # El stock ya se descuento cuando
+                # El stock ya se desconto cuando
                 # se creo el pedido.
                 # Aqui solo actualizamos su estado.
                 pedido.status = "paid"
