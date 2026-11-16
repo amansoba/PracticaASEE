@@ -1,0 +1,438 @@
+# Integration files preserve the original Practice 3 templates.
+name: subsonic
+services:
+  auth-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: subsonic
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-example-local-postgres-only}
+      POSTGRES_DB: subsonic_auth
+    volumes:
+    - auth-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U subsonic -d subsonic_auth
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+    - backend
+  auth-seed:
+    image: subsonic-auth:local
+    build: &id001
+      context: .
+      dockerfile: infra/Dockerfile.backend
+      args:
+        SERVICE: auth
+    environment:
+      DB_HOST: auth-db
+      DB_PORT: '5432'
+      DB_USER: subsonic
+      DB_PASSWORD: ${DB_PASSWORD:-example-local-postgres-only}
+      DB_NAME: subsonic_auth
+      AUTH_SERVICE_URL: http://auth:8000
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-example-local-jwt-key-at-least-32-characters}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: '60'
+      SEED_PASSWORD: ${SEED_PASSWORD:-DemoSubsonic2026!}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-demo.admin@subsonic.example.com}
+      SEED_PROVIDER_EMAIL: ${SEED_PROVIDER_EMAIL:-demo.provider@subsonic.example.com}
+      SEED_CLIENT_EMAIL: ${SEED_CLIENT_EMAIL:-demo.client@subsonic.example.com}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-http://localhost:5173/reset-password}
+    command:
+    - python
+    - /app/scripts/seed.py
+    - --service
+    - auth
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    restart: 'no'
+    networks:
+    - backend
+  auth:
+    image: subsonic-auth:local
+    build: *id001
+    environment:
+      DB_HOST: auth-db
+      DB_PORT: '5432'
+      DB_USER: subsonic
+      DB_PASSWORD: ${DB_PASSWORD:-example-local-postgres-only}
+      DB_NAME: subsonic_auth
+      AUTH_SERVICE_URL: http://auth:8000
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-example-local-jwt-key-at-least-32-characters}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: '60'
+      SEED_PASSWORD: ${SEED_PASSWORD:-DemoSubsonic2026!}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-demo.admin@subsonic.example.com}
+      SEED_PROVIDER_EMAIL: ${SEED_PROVIDER_EMAIL:-demo.provider@subsonic.example.com}
+      SEED_CLIENT_EMAIL: ${SEED_CLIENT_EMAIL:-demo.client@subsonic.example.com}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-http://localhost:5173/reset-password}
+    ports:
+    - 127.0.0.1:8001:8000
+    depends_on:
+      auth-seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready',
+        timeout=2)
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks:
+    - backend
+  catalog-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: subsonic
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-example-local-postgres-only}
+      POSTGRES_DB: subsonic_catalog
+    volumes:
+    - catalog-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U subsonic -d subsonic_catalog
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+    - backend
+  catalog-seed:
+    image: subsonic-catalog:local
+    build: &id002
+      context: .
+      dockerfile: infra/Dockerfile.backend
+      args:
+        SERVICE: catalog
+    environment:
+      DB_HOST: catalog-db
+      DB_PORT: '5432'
+      DB_USER: subsonic
+      DB_PASSWORD: ${DB_PASSWORD:-example-local-postgres-only}
+      DB_NAME: subsonic_catalog
+      AUTH_SERVICE_URL: http://auth:8000
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+    command:
+    - python
+    - /app/scripts/seed.py
+    - --service
+    - catalog
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+    restart: 'no'
+    networks:
+    - backend
+  catalog:
+    image: subsonic-catalog:local
+    build: *id002
+    environment:
+      DB_HOST: catalog-db
+      DB_PORT: '5432'
+      DB_USER: subsonic
+      DB_PASSWORD: ${DB_PASSWORD:-example-local-postgres-only}
+      DB_NAME: subsonic_catalog
+      AUTH_SERVICE_URL: http://auth:8000
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+    ports:
+    - 127.0.0.1:8003:8000
+    depends_on:
+      catalog-seed:
+        condition: service_completed_successfully
+      auth:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready',
+        timeout=2)
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks:
+    - backend
+  event-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: subsonic
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-example-local-postgres-only}
+      POSTGRES_DB: subsonic_events
+    volumes:
+    - event-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U subsonic -d subsonic_events
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+    - backend
+  event-seed:
+    image: subsonic-event:local
+    build: &id003
+      context: .
+      dockerfile: infra/Dockerfile.backend
+      args:
+        SERVICE: event
+    environment:
+      DB_HOST: event-db
+      DB_PORT: '5432'
+      DB_USER: subsonic
+      DB_PASSWORD: ${DB_PASSWORD:-example-local-postgres-only}
+      DB_NAME: subsonic_events
+      AUTH_SERVICE_URL: http://auth:8000
+      CATALOG_SERVICE_URL: http://catalog:8000
+    command:
+    - python
+    - /app/scripts/seed.py
+    - --service
+    - event
+    depends_on:
+      event-db:
+        condition: service_healthy
+    restart: 'no'
+    networks:
+    - backend
+  event:
+    image: subsonic-event:local
+    build: *id003
+    environment:
+      DB_HOST: event-db
+      DB_PORT: '5432'
+      DB_USER: subsonic
+      DB_PASSWORD: ${DB_PASSWORD:-example-local-postgres-only}
+      DB_NAME: subsonic_events
+      AUTH_SERVICE_URL: http://auth:8000
+      CATALOG_SERVICE_URL: http://catalog:8000
+    ports:
+    - 127.0.0.1:8002:8000
+    depends_on:
+      event-seed:
+        condition: service_completed_successfully
+      auth:
+        condition: service_healthy
+      catalog:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready',
+        timeout=2)
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks:
+    - backend
+  commerce-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: subsonic
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-example-local-postgres-only}
+      POSTGRES_DB: subsonic_commerce
+    volumes:
+    - commerce-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U subsonic -d subsonic_commerce
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+    - backend
+  commerce-seed:
+    image: subsonic-commerce:local
+    build: &id004
+      context: .
+      dockerfile: infra/Dockerfile.backend
+      args:
+        SERVICE: commerce
+    environment:
+      DB_HOST: commerce-db
+      DB_PORT: '5432'
+      DB_USER: subsonic
+      DB_PASSWORD: ${DB_PASSWORD:-example-local-postgres-only}
+      DB_NAME: subsonic_commerce
+      AUTH_SERVICE_URL: http://auth:8000
+    command:
+    - python
+    - /app/scripts/seed.py
+    - --service
+    - commerce
+    depends_on:
+      commerce-db:
+        condition: service_healthy
+    restart: 'no'
+    networks:
+    - backend
+  commerce:
+    image: subsonic-commerce:local
+    build: *id004
+    environment:
+      DB_HOST: commerce-db
+      DB_PORT: '5432'
+      DB_USER: subsonic
+      DB_PASSWORD: ${DB_PASSWORD:-example-local-postgres-only}
+      DB_NAME: subsonic_commerce
+      AUTH_SERVICE_URL: http://auth:8000
+    ports:
+    - 127.0.0.1:8004:8000
+    depends_on:
+      commerce-seed:
+        condition: service_completed_successfully
+      auth:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready',
+        timeout=2)
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks:
+    - backend
+  provider-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: subsonic
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-example-local-postgres-only}
+      POSTGRES_DB: subsonic_providers
+    volumes:
+    - provider-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U subsonic -d subsonic_providers
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+    - backend
+  provider-seed:
+    image: subsonic-provider:local
+    build: &id005
+      context: .
+      dockerfile: infra/Dockerfile.backend
+      args:
+        SERVICE: provider
+    environment:
+      DB_HOST: provider-db
+      DB_PORT: '5432'
+      DB_USER: subsonic
+      DB_PASSWORD: ${DB_PASSWORD:-example-local-postgres-only}
+      DB_NAME: subsonic_providers
+      AUTH_SERVICE_URL: http://auth:8000
+      EVENT_SERVICE_URL: http://event:8000
+      SEED_PROVIDER_EMAIL: ${SEED_PROVIDER_EMAIL:-demo.provider@subsonic.example.com}
+    command:
+    - python
+    - /app/scripts/seed.py
+    - --service
+    - provider
+    depends_on:
+      provider-db:
+        condition: service_healthy
+    restart: 'no'
+    networks:
+    - backend
+  provider:
+    image: subsonic-provider:local
+    build: *id005
+    environment:
+      DB_HOST: provider-db
+      DB_PORT: '5432'
+      DB_USER: subsonic
+      DB_PASSWORD: ${DB_PASSWORD:-example-local-postgres-only}
+      DB_NAME: subsonic_providers
+      AUTH_SERVICE_URL: http://auth:8000
+      EVENT_SERVICE_URL: http://event:8000
+      SEED_PROVIDER_EMAIL: ${SEED_PROVIDER_EMAIL:-demo.provider@subsonic.example.com}
+    ports:
+    - 127.0.0.1:8005:8000
+    depends_on:
+      provider-seed:
+        condition: service_completed_successfully
+      auth:
+        condition: service_healthy
+      event:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready',
+        timeout=2)
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks:
+    - backend
+  frontend:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.frontend
+    ports:
+    - 127.0.0.1:5173:80
+    depends_on:
+      auth:
+        condition: service_healthy
+      catalog:
+        condition: service_healthy
+      event:
+        condition: service_healthy
+      commerce:
+        condition: service_healthy
+      provider:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --spider
+      - -q
+      - http://127.0.0.1/
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks:
+    - backend
+volumes:
+  auth-data: {}
+  catalog-data: {}
+  event-data: {}
+  commerce-data: {}
+  provider-data: {}
+networks:
+  backend: {}

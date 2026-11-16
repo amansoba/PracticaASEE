@@ -17,8 +17,8 @@ info:
       para permitir la asignación de espacios y servicios externos.
 
 servers:
-  - url: https://api.subsonic.com/events/v1
-    description: Servidor de desarrollo
+  - url: http://localhost:8002
+    description: Desarrollo local (Compose)
 
 tags:
   - name: Eventos
@@ -29,6 +29,46 @@ tags:
     description: Configuración de tipos de pase, venta y consulta de entradas de usuarios
 
 paths:
+  /health:
+    get:
+      tags:
+      - Health
+      operationId: health
+      summary: Liveness
+      responses:
+        '200':
+          description: Process alive
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /ready:
+    get:
+      tags:
+      - Health
+      operationId: ready
+      summary: Local database readiness
+      responses:
+        '200':
+          description: Local database available
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                properties:
+                  status:
+                    type: string
+                    example: ready
+        '503':
+          description: Local database unavailable
   /events:
     get:
       tags:
@@ -499,6 +539,7 @@ components:
             de Catálogo Musical y se utiliza como referencia foránea.
           example: "art_12345"
         artist_name:
+          nullable: true
           type: string
           description: Nombre del artista para visualización rápida.
           example: "Daft Punk"
@@ -535,6 +576,7 @@ components:
           description: Referencia foránea hacia el artista en Catálogo Musical.
           example: "art_12345"
         artist_name:
+          nullable: true
           type: string
           description: Nombre del artista.
           example: "Daft Punk"
@@ -574,6 +616,7 @@ components:
           description: Aforo total reservado para este tipo de pase.
           example: 5000
         benefits:
+          nullable: true
           type: array
           description: Ventajas asociadas al pase.
           items:
@@ -616,6 +659,7 @@ components:
           description: Entradas restantes disponibles para venta.
           example: 4890
         benefits:
+          nullable: true
           type: array
           description: Beneficios incluidos.
           items:
@@ -644,6 +688,7 @@ components:
             Autenticación y Cuentas y se utiliza para asociar la propiedad de la entrada.
           example: "usr_555"
         payment_token:
+          nullable: true
           type: string
           description: Token de pasarela de pago para confirmar la transacción.
           example: "tok_visa_4242"

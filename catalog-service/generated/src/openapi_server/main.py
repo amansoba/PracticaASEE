@@ -27,3 +27,6 @@ app = FastAPI(
 
 app.include_router(ArtistasApiRouter)
 app.include_router(CancionesApiRouter)
+
+from openapi_server.health import router as health_router
+app.include_router(health_router)

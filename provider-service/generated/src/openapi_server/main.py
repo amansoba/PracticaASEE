@@ -29,3 +29,6 @@ app = FastAPI(
 app.include_router(PresupuestosYSolicitudesApiRouter)
 app.include_router(ProveedoresApiRouter)
 app.include_router(ServiciosYEspaciosApiRouter)
+
+from openapi_server.health import router as health_router
+app.include_router(health_router)

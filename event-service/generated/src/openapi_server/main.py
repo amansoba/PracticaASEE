@@ -29,3 +29,6 @@ app = FastAPI(
 app.include_router(EventosApiRouter)
 app.include_router(LineUpApiRouter)
 app.include_router(PasesYEntradasApiRouter)
+
+from openapi_server.health import router as health_router
+app.include_router(health_router)

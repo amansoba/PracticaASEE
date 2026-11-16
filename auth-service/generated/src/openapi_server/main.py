@@ -31,3 +31,6 @@ app = FastAPI(
 app.include_router(auth_flows_router)
 app.include_router(AutenticacinApiRouter)
 app.include_router(UsuariosApiRouter)
+
+from openapi_server.health import router as health_router
+app.include_router(health_router)

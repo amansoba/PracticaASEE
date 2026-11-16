@@ -3,9 +3,11 @@ from pathlib import Path
 import os
 import subprocess
 import sys
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func, inspect, select
+from sqlalchemy.exc import OperationalError
 
 from openapi_server.database import engine, SessionLocal
 from openapi_server.db_models import Base
@@ -35,6 +37,11 @@ assert all(n > 0 for name, n in before.items() if name not in {
 subprocess.run(command, check=True)
 assert counts() == before, "Seed duplicated rows"
 with TestClient(app) as client:
+    assert client.get("/health").status_code == 200
+    assert client.get("/ready").status_code == 200
+    with patch("openapi_server.health.engine.connect", side_effect=OperationalError("test", {}, Exception("offline"))):
+        assert client.get("/health").status_code == 200
+        assert client.get("/ready").status_code == 503
     if service == "auth":
         response = client.post("/auth/login", json={
             "email": os.getenv("SEED_ADMIN_EMAIL", "demo.admin@subsonic.example.com"),
