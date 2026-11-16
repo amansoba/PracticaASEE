@@ -22,7 +22,6 @@ async def get_token_BearerAuth(
     )
 ) -> TokenModel:
 
-    # Comprobar que se ha enviado un token Bearer
     if credentials is None or not credentials.credentials:
         raise HTTPException(
             status_code=401,
@@ -38,7 +37,6 @@ async def get_token_BearerAuth(
             detail="Servicio de autenticacion no configurado"
         )
 
-    # Delegar la validacion del token en auth-service
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             respuesta = await client.get(
@@ -99,7 +97,7 @@ async def get_token_BearerAuth(
     ruta = request.url.path
     metodo = request.method
 
-    # Gestion administrativa de festivales y pases
+    # Operaciones exclusivas de administradores.
     es_operacion_administrativa = (
         (ruta == "/events" and metodo == "POST")
         or (
@@ -116,6 +114,10 @@ async def get_token_BearerAuth(
             and ruta.endswith("/passes")
             and metodo == "POST"
         )
+        or (
+            ruta == "/tickets/validate"
+            and metodo == "POST"
+        )
     )
 
     if es_operacion_administrativa and rol != "admin":
@@ -124,7 +126,7 @@ async def get_token_BearerAuth(
             detail="Se requiere rol de administrador"
         )
 
-    # Cada usuario solo puede consultar sus entradas
+    # Cada usuario solo puede consultar sus entradas.
     if (
         ruta.startswith("/tickets/user/")
         and metodo == "GET"
@@ -137,7 +139,7 @@ async def get_token_BearerAuth(
                 detail="No puedes consultar entradas de otro usuario"
             )
 
-    # Impedir compras asignadas a un usuario diferente
+    # No permitir compras asignadas a otra persona.
     if ruta == "/tickets/purchase" and metodo == "POST":
 
         try:
