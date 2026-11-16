@@ -1,9 +1,13 @@
 
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from hashlib import sha256
+import json
 from uuid import uuid4
 
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from openapi_server.apis.pedidos_api_base import BasePedidosApi
@@ -44,6 +48,9 @@ TRANSICIONES = {
     "delivered": set(),
     "cancelled": set()
 }
+
+# Tiempo maximo de reserva de stock sin pagar.
+MINUTOS_EXPIRACION = 30
 
 
 # ============================================================
@@ -145,6 +152,84 @@ def validar_articulos(items):
     return cantidades
 
 
+def calcular_huella_solicitud(
+    user_id: str,
+    cantidades: dict,
+    direccion: str,
+    metodo_pago: str | None
+) -> str:
+    """
+    Calcula una huella estable de la compra.
+
+    No se utiliza el precio enviado por el cliente,
+    ya que el precio real procede del catalogo.
+    """
+
+    datos = {
+        "user_id": user_id,
+        "items": [
+            {
+                "product_id": producto_id,
+                "size": talla,
+                "quantity": cantidad
+            }
+            for (producto_id, talla), cantidad
+            in sorted(cantidades.items())
+        ],
+        "shipping_address": direccion,
+        "payment_method_id": metodo_pago
+    }
+
+    contenido = json.dumps(
+        datos,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False
+    )
+
+    return sha256(
+        contenido.encode("utf-8")
+    ).hexdigest()
+
+
+def comprobar_reintento(
+    db,
+    user_id: str,
+    clave: str,
+    huella: str
+):
+    """
+    Busca un pedido con la misma clave para
+    el mismo usuario.
+
+    Si los datos coinciden, devuelve el pedido.
+    Si son diferentes, devuelve un error 409.
+    """
+
+    existente = db.scalar(
+        select(OrderDB)
+        .options(selectinload(OrderDB.items))
+        .where(
+            OrderDB.user_id == user_id,
+            OrderDB.idempotency_key == clave
+        )
+    )
+
+    if existente is None:
+        return None
+
+    if existente.request_fingerprint != huella:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "La clave de idempotencia ya se utilizo "
+                "con una compra diferente"
+            )
+        )
+
+    return convertir_pedido(existente)
+
+
 def devolver_stock(db, pedido: OrderDB):
     """
     Devuelve al inventario las unidades reservadas
@@ -223,6 +308,87 @@ def devolver_stock(db, pedido: OrderDB):
 
 
 # ============================================================
+# EXPIRACION DE PEDIDOS PENDIENTES
+# ============================================================
+
+def expirar_pedidos_pendientes() -> int:
+    """
+    Cancela los pedidos pendientes que hayan superado
+    el tiempo maximo de reserva.
+
+    Devuelve el numero de pedidos cancelados.
+
+    Cada pedido se procesa en su propia transaccion,
+    bloqueando su fila antes de modificar el inventario.
+    """
+
+    fecha_limite = (
+        datetime.now(timezone.utc)
+        - timedelta(minutes=MINUTOS_EXPIRACION)
+    )
+
+    # Buscar los identificadores de los pedidos caducados.
+    # No mantenemos bloqueados todos los pedidos a la vez.
+    with SessionLocal() as db:
+        pedidos_ids = db.scalars(
+            select(OrderDB.id)
+            .where(
+                OrderDB.status == "pending",
+                OrderDB.created_at <= fecha_limite
+            )
+            .order_by(OrderDB.id)
+        ).all()
+
+    total_expirados = 0
+
+    for pedido_id in pedidos_ids:
+
+        with SessionLocal() as db:
+            try:
+                # Bloquear el pedido antes de cancelarlo.
+                # Esto coordina la caducidad con pagos
+                # y cancelaciones simultaneas.
+                pedido = db.scalar(
+                    select(OrderDB)
+                    .where(OrderDB.id == pedido_id)
+                    .with_for_update()
+                )
+
+                if pedido is None:
+                    continue
+
+                # Volver a comprobar el estado porque
+                # otro proceso podria haber pagado o
+                # cancelado el pedido mientras esperabamos.
+                if pedido.status != "pending":
+                    continue
+
+                # Comprobar tambien que sigue caducado.
+                if pedido.created_at > fecha_limite:
+                    continue
+
+                # Cargar los articulos del pedido.
+                _ = pedido.items
+
+                # Devolver el stock reservado.
+                devolver_stock(db, pedido)
+
+                # Cancelar el pedido dentro de la misma
+                # transaccion que repone el inventario.
+                pedido.status = "cancelled"
+
+                db.commit()
+
+                total_expirados += 1
+
+            except Exception:
+                db.rollback()
+                raise
+
+    return total_expirados
+
+
+# ============================================================
 # IMPLEMENTACION DE PEDIDOS
 # ============================================================
 
@@ -232,7 +398,8 @@ class PedidosApiImpl(BasePedidosApi):
     async def create_order(
         self,
         order_request: OrderRequest,
-        usuario_actual: dict
+        usuario_actual: dict,
+        idempotency_key: str | None = None
     ) -> Order:
 
         comprobar_usuario(
@@ -252,6 +419,33 @@ class PedidosApiImpl(BasePedidosApi):
             order_request.items
         )
 
+        # Comprobar y normalizar la clave opcional.
+        if idempotency_key is not None:
+
+            idempotency_key = idempotency_key.strip()
+
+            if (
+                not idempotency_key
+                or len(idempotency_key) > 128
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "La clave de idempotencia debe tener "
+                        "entre 1 y 128 caracteres"
+                    )
+                )
+
+            huella = calcular_huella_solicitud(
+                order_request.user_id,
+                cantidades,
+                direccion,
+                order_request.payment_method_id
+            )
+
+        else:
+            huella = None
+
         productos_ids = sorted({
             producto_id
             for producto_id, _ in cantidades
@@ -259,12 +453,41 @@ class PedidosApiImpl(BasePedidosApi):
 
         with SessionLocal() as db:
             try:
+                # Si la clave ya existe, resolver el reintento
+                # antes de consultar o descontar inventario.
+                if idempotency_key is not None:
+                    repetido = comprobar_reintento(
+                        db,
+                        order_request.user_id,
+                        idempotency_key,
+                        huella
+                    )
+
+                    if repetido is not None:
+                        return repetido
+
+                # Bloquear productos para coordinar
+                # compras simultaneas.
                 productos = db.scalars(
                     select(ProductDB)
                     .where(ProductDB.id.in_(productos_ids))
                     .order_by(ProductDB.id)
                     .with_for_update()
                 ).all()
+
+                # Otra compra con la misma clave podria
+                # haberse confirmado mientras esperabamos
+                # a obtener los bloqueos de inventario.
+                if idempotency_key is not None:
+                    repetido = comprobar_reintento(
+                        db,
+                        order_request.user_id,
+                        idempotency_key,
+                        huella
+                    )
+
+                    if repetido is not None:
+                        return repetido
 
                 productos_por_id = {
                     producto.id: producto
@@ -344,6 +567,8 @@ class PedidosApiImpl(BasePedidosApi):
                     payment_method_id=(
                         order_request.payment_method_id
                     ),
+                    idempotency_key=idempotency_key,
+                    request_fingerprint=huella,
                     total_price=total,
                     status="pending",
                     items=articulos_pedido
@@ -355,6 +580,25 @@ class PedidosApiImpl(BasePedidosApi):
                 pedido = obtener_pedido(db, pedido.id)
 
                 return convertir_pedido(pedido)
+
+            except IntegrityError:
+                # Una solicitud simultanea podria haber
+                # insertado antes la misma clave.
+                # Revertimos cualquier descuento de stock.
+                db.rollback()
+
+                if idempotency_key is not None:
+                    repetido = comprobar_reintento(
+                        db,
+                        order_request.user_id,
+                        idempotency_key,
+                        huella
+                    )
+
+                    if repetido is not None:
+                        return repetido
+
+                raise
 
             except Exception:
                 db.rollback()
@@ -472,6 +716,145 @@ class PedidosApiImpl(BasePedidosApi):
                     devolver_stock(db, pedido)
 
                 pedido.status = nuevo_estado
+
+                db.commit()
+
+                return None
+
+            except Exception:
+                db.rollback()
+                raise
+
+    # POST /orders/{id}/cancel
+    async def cancel_order(
+        self,
+        id: str,
+        usuario_actual: dict
+    ) -> None:
+        """
+        Permite al propietario cancelar su pedido
+        mientras permanezca pendiente.
+
+        La cancelacion y la reposicion del stock
+        se realizan en una unica transaccion.
+        """
+
+        with SessionLocal() as db:
+            try:
+                # Bloquear el pedido para impedir que dos
+                # cancelaciones devuelvan el stock dos veces.
+                pedido = db.scalar(
+                    select(OrderDB)
+                    .where(OrderDB.id == id)
+                    .with_for_update()
+                )
+
+                if pedido is None:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="Pedido no encontrado"
+                    )
+
+                # Comprobar la identidad antes de consultar
+                # o modificar el estado del pedido.
+                comprobar_usuario(
+                    usuario_actual,
+                    pedido.user_id
+                )
+
+                # Una cancelacion repetida no debe
+                # reponer el inventario nuevamente.
+                if pedido.status == "cancelled":
+                    return None
+
+                # Solo los pedidos pendientes se pueden
+                # cancelar desde la cuenta del cliente.
+                if pedido.status != "pending":
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "Solo se pueden cancelar "
+                            "pedidos pendientes"
+                        )
+                    )
+
+                # Cargar los articulos y reponer stock
+                # reutilizando la funcion ya existente.
+                _ = pedido.items
+                devolver_stock(db, pedido)
+
+                # Actualizar el pedido dentro de la
+                # misma transaccion de inventario.
+                pedido.status = "cancelled"
+
+                db.commit()
+
+                return None
+
+            except Exception:
+                db.rollback()
+                raise
+
+    # POST /orders/{id}/pay
+    async def pay_order(
+        self,
+        id: str,
+        payment_token: str,
+        usuario_actual: dict
+    ) -> None:
+        """
+        Simula el pago de un pedido pendiente.
+
+        No realiza ningun cobro real ni se conecta
+        con una pasarela de pagos.
+        """
+
+        with SessionLocal() as db:
+            try:
+                # Bloquear el pedido para evitar que
+                # dos pagos simultaneos lo procesen
+                # dos veces o interfieran con su cancelacion.
+                pedido = db.scalar(
+                    select(OrderDB)
+                    .where(OrderDB.id == id)
+                    .with_for_update()
+                )
+
+                if pedido is None:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="Pedido no encontrado"
+                    )
+
+                # Solo el propietario puede pagar.
+                comprobar_usuario(
+                    usuario_actual,
+                    pedido.user_id
+                )
+
+                # Solo admitimos la transicion
+                # pending -> paid.
+                if pedido.status != "pending":
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "Solo se pueden pagar "
+                            "pedidos pendientes"
+                        )
+                    )
+
+                # Token ficticio aceptado exclusivamente
+                # en este entorno de simulacion.
+                if payment_token != "tok_test_success":
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Pago simulado rechazado"
+                    )
+
+                # El stock ya se desconto cuando
+                # se creo el pedido.
+                # Aqui solo actualizamos su estado.
+                pedido.status = "paid"
 
                 db.commit()
 

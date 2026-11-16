@@ -242,6 +242,78 @@ paths:
         '404':
           description: El artista especificado no existe.
 
+  /artists/{artistId}/songs/{songId}:
+    put:
+      tags:
+        - Canciones
+      summary: Actualizar una cancion
+      operationId: updateSong
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: artistId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: songId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSongRequest'
+      responses:
+        '200':
+          description: Cancion actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Song'
+        '400':
+          description: Datos invalidos.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Se requiere administrador.
+        '404':
+          description: Artista o cancion no encontrados.
+        '503':
+          description: Autenticacion no disponible.
+    delete:
+      tags:
+        - Canciones
+      summary: Eliminar una cancion
+      operationId: deleteSong
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: artistId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: songId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Cancion eliminada.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Se requiere administrador.
+        '404':
+          description: Artista o cancion no encontrados.
+        '503':
+          description: Autenticacion no disponible.
+
 components:
   securitySchemes:
     BearerAuth:

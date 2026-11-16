@@ -139,14 +139,23 @@ class UsuariosApiImpl(BaseUsuariosApi):
                     detail="Usuario autenticado no encontrado"
                 )
 
-            # Este endpoint permite consultar perfiles de otros
-            # usuarios autenticados, segun el contrato OpenAPI.
             usuario = db.get(UserDB, id)
 
             if usuario is None:
                 raise HTTPException(
                     status_code=404,
                     detail="Usuario no encontrado"
+                )
+
+            # Solo el propio usuario o un administrador
+            # pueden consultar el perfil completo.
+            if (
+                solicitante.id != usuario.id
+                and solicitante.role != "admin"
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail="No tienes permiso para consultar este perfil"
                 )
 
             return convertir_perfil(usuario)

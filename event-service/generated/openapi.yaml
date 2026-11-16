@@ -378,6 +378,51 @@ paths:
       summary: Consultar las entradas adquiridas por un usuario
       tags:
       - Pases y Entradas
+  /tickets/validate:
+    post:
+      tags:
+        - Pases y Entradas
+      summary: Validar una entrada mediante QR
+      description: >
+        Valida una entrada y la marca como utilizada.
+        No permite usar dos veces el mismo QR.
+        Operacion exclusiva para administradores.
+      operationId: validateTicket
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - qr_code
+              properties:
+                qr_code:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+      responses:
+        '200':
+          description: Entrada validada correctamente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '400':
+          description: Codigo QR incorrecto.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Se requiere administrador.
+        '404':
+          description: Entrada no encontrada.
+        '409':
+          description: Entrada utilizada o cancelada.
+        '503':
+          description: Autenticacion no disponible.
+
 components:
   schemas:
     CreateEventRequest:

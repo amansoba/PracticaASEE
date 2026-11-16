@@ -75,6 +75,13 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '401':
           description: Credenciales incorrectas.
+        '429':
+          description: Demasiados intentos de inicio de sesion.
+          headers:
+            Retry-After:
+              description: Segundos restantes del bloqueo.
+              schema:
+                type: integer
 
   /auth/logout:
     post:
@@ -263,6 +270,37 @@ paths:
           description: Acceso denegado. Requiere rol de administrador.
         '404':
           description: El usuario indicado no existe.
+
+  /auth/reset-password/confirm:
+    post:
+      tags:
+        - Autenticación
+      summary: Confirmar recuperacion de contrasena
+      description: >
+        Confirma el restablecimiento mediante un token
+        temporal enviado por correo electronico.
+      operationId: confirmPasswordReset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - new_password
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                new_password:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Contrasena actualizada correctamente.
+        '400':
+          description: Token invalido, caducado o utilizado.
 
 components:
   securitySchemes:

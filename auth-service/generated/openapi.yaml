@@ -78,6 +78,13 @@ paths:
           description: Autenticación exitosa. Devuelve el token de acceso.
         "401":
           description: Credenciales incorrectas.
+        '429':
+          description: Demasiados intentos de inicio de sesion.
+          headers:
+            Retry-After:
+              description: Segundos restantes del bloqueo.
+              schema:
+                type: integer
       summary: Iniciar sesión
       tags:
         - Autenticación
