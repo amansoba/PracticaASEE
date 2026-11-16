@@ -13,11 +13,13 @@
 
 
 from fastapi import FastAPI
+from openapi_server.lifecycle import lifespan
 
 from openapi_server.apis.pedidos_api import router as PedidosApiRouter
 from openapi_server.apis.productos_api import router as ProductosApiRouter
 
 app = FastAPI(
+    lifespan=lifespan,
     title="API de Tienda y Merchandising - Subsonic Festival",
     description="API responsable de la gestión de la tienda oficial, productos físicos, control de stock e inventario por tallas y procesamiento de pedidos. El microservicio de Tienda es propietario del catálogo de merchandising y los pedidos. Para realizar sus operaciones se comunica de forma síncrona con: - Autenticación y Cuentas: consulta GET /users/{userId} para validar que el cliente   que efectúa la compra existe, está activo y posee los permisos correspondientes. ",
     version="1.1.0",

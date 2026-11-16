@@ -13,11 +13,13 @@
 
 
 from fastapi import FastAPI
+from openapi_server.lifecycle import lifespan
 
 from openapi_server.apis.artistas_api import router as ArtistasApiRouter
 from openapi_server.apis.canciones_api import router as CancionesApiRouter
 
 app = FastAPI(
+    lifespan=lifespan,
     title="API de Catálogo Musical - Subsonic Festival",
     description="API responsable de gestionar el catálogo musical, incluyendo fichas de artistas, biografías, géneros, catálogo de canciones e integración con la API de Spotify. El microservicio de Catálogo Musical es el propietario de la información artística y discográfica. Proporciona información a otros microservicios: - Gestión de Eventos: consulta la información de los artistas mediante GET /artists/{id}   para validar su existencia y construir el line-up/horarios de cada festival. - Se integra de forma externa con la API pública de Spotify para metadatos y preescuchas. ",
     version="1.2.0",

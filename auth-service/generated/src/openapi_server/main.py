@@ -13,6 +13,7 @@
 
 
 from fastapi import FastAPI
+from openapi_server.lifecycle import lifespan
 
 from openapi_server.apis.autenticacin_api import router as AutenticacinApiRouter
 from openapi_server.apis.usuarios_api import router as UsuariosApiRouter
@@ -21,6 +22,7 @@ from openapi_server.auth_flows import router as auth_flows_router
 
 
 app = FastAPI(
+    lifespan=lifespan,
     title="API de Autenticación y Cuentas - Subsonic Festival",
     description="API responsable de la autenticación, registro, gestión de sesiones, perfiles de usuario y asignación de roles dentro de la plataforma. El microservicio de Autenticación y Cuentas es el propietario de las credenciales, tokens y perfiles de los usuarios. Es invocado por otros microservicios para: - Tienda / Merchandising: verificar la identidad del cliente que realiza pedidos y asociarle la compra. - Gestión de Eventos: validar la identidad del usuario comprador para asociarle las entradas. - Gestión de Proveedores: comprobar permisos y roles (provider o admin) antes de gestionar presupuestos o espacios. ",
     version="1.2.0",

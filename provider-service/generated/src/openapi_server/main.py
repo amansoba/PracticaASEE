@@ -13,12 +13,14 @@
 
 
 from fastapi import FastAPI
+from openapi_server.lifecycle import lifespan
 
 from openapi_server.apis.presupuestos_y_solicitudes_api import router as PresupuestosYSolicitudesApiRouter
 from openapi_server.apis.proveedores_api import router as ProveedoresApiRouter
 from openapi_server.apis.servicios_y_espacios_api import router as ServiciosYEspaciosApiRouter
 
 app = FastAPI(
+    lifespan=lifespan,
     title="API de Gestión de Proveedores - Subsonic Festival",
     description="API responsable de la gestión de proveedores externos, catálogo de servicios (sonido, escenarios, barras), espacios alquilables por evento y presupuestos. El microservicio de Gestión de Proveedores es propietario de las propuestas y servicios B2B. Para operar se comunica con los siguientes microservicios: - Autenticación y Cuentas: realiza una consulta síncrona GET /users/{userId} para verificar   identidad, rol y permisos (provider o admin) antes de gestionar solicitudes. - Gestión de Eventos: realiza una consulta síncrona GET /events/{eventId} para obtener   información de fechas y recintos del festival al cual se asigna un espacio o servicio. ",
     version="1.2.0",

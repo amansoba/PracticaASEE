@@ -13,12 +13,14 @@
 
 
 from fastapi import FastAPI
+from openapi_server.lifecycle import lifespan
 
 from openapi_server.apis.eventos_api import router as EventosApiRouter
 from openapi_server.apis.line_up_api import router as LineUpApiRouter
 from openapi_server.apis.pases_y_entradas_api import router as PasesYEntradasApiRouter
 
 app = FastAPI(
+    lifespan=lifespan,
     title="API de Gestión de Eventos - Subsonic Festival",
     description="API responsable de la gestión de festivales, fechas, recintos, horarios/line-up, configuración de tipos de pases y emisión y venta de entradas. El microservicio de Gestión de Eventos es propietario de las ediciones del festival, la programación horaria y las entradas adquiridas. Para operar se comunica con: - Catálogo Musical: realiza una consulta síncrona GET /artists/{id} para validar la existencia   del artista antes de asignarlo a un escenario en el line-up. - Autenticación y Cuentas: realiza una consulta síncrona GET /users/{userId} al momento de   la compra de entradas para asociar el pase emitido al usuario correspondiente. - Gestión de Proveedores: proporciona información del festival (GET /events/{id})   para permitir la asignación de espacios y servicios externos. ",
     version="1.2.0",
