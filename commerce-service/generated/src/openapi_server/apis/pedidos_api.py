@@ -7,6 +7,7 @@ from fastapi import (
     APIRouter,
     Body,
     Depends,
+    Header,
     HTTPException,
     Path
 )
@@ -75,7 +76,9 @@ class SimulatedPaymentRequest(BaseModel):
         401: {"description": "No autenticado"},
         403: {"description": "Comprador no autorizado"},
         404: {"description": "Usuario no encontrado"},
-        409: {"description": "Stock insuficiente"},
+        409: {
+            "description": "Stock insuficiente o clave reutilizada"
+        },
         503: {"description": "Autenticacion no disponible"}
     }
 )
@@ -84,6 +87,10 @@ async def create_order(
     usuario_actual: dict = Depends(obtener_usuario_actual),
     credentials: HTTPAuthorizationCredentials = Depends(
         bearer_auth
+    ),
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key"
     )
 ) -> Order:
 
@@ -103,7 +110,8 @@ async def create_order(
 
     return await obtener_implementacion().create_order(
         order_request,
-        usuario_actual
+        usuario_actual,
+        idempotency_key
     )
 
 

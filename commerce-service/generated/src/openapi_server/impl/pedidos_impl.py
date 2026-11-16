@@ -1,10 +1,13 @@
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from hashlib import sha256
+import json
 from uuid import uuid4
 
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from openapi_server.apis.pedidos_api_base import BasePedidosApi
@@ -147,6 +150,84 @@ def validar_articulos(items):
         )
 
     return cantidades
+
+
+def calcular_huella_solicitud(
+    user_id: str,
+    cantidades: dict,
+    direccion: str,
+    metodo_pago: str | None
+) -> str:
+    """
+    Calcula una huella estable de la compra.
+
+    No se utiliza el precio enviado por el cliente,
+    ya que el precio real procede del catalogo.
+    """
+
+    datos = {
+        "user_id": user_id,
+        "items": [
+            {
+                "product_id": producto_id,
+                "size": talla,
+                "quantity": cantidad
+            }
+            for (producto_id, talla), cantidad
+            in sorted(cantidades.items())
+        ],
+        "shipping_address": direccion,
+        "payment_method_id": metodo_pago
+    }
+
+    contenido = json.dumps(
+        datos,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False
+    )
+
+    return sha256(
+        contenido.encode("utf-8")
+    ).hexdigest()
+
+
+def comprobar_reintento(
+    db,
+    user_id: str,
+    clave: str,
+    huella: str
+):
+    """
+    Busca un pedido con la misma clave para
+    el mismo usuario.
+
+    Si los datos coinciden, devuelve el pedido.
+    Si son diferentes, devuelve un error 409.
+    """
+
+    existente = db.scalar(
+        select(OrderDB)
+        .options(selectinload(OrderDB.items))
+        .where(
+            OrderDB.user_id == user_id,
+            OrderDB.idempotency_key == clave
+        )
+    )
+
+    if existente is None:
+        return None
+
+    if existente.request_fingerprint != huella:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "La clave de idempotencia ya se utilizo "
+                "con una compra diferente"
+            )
+        )
+
+    return convertir_pedido(existente)
 
 
 def devolver_stock(db, pedido: OrderDB):
@@ -317,7 +398,8 @@ class PedidosApiImpl(BasePedidosApi):
     async def create_order(
         self,
         order_request: OrderRequest,
-        usuario_actual: dict
+        usuario_actual: dict,
+        idempotency_key: str | None = None
     ) -> Order:
 
         comprobar_usuario(
@@ -337,6 +419,33 @@ class PedidosApiImpl(BasePedidosApi):
             order_request.items
         )
 
+        # Comprobar y normalizar la clave opcional.
+        if idempotency_key is not None:
+
+            idempotency_key = idempotency_key.strip()
+
+            if (
+                not idempotency_key
+                or len(idempotency_key) > 128
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "La clave de idempotencia debe tener "
+                        "entre 1 y 128 caracteres"
+                    )
+                )
+
+            huella = calcular_huella_solicitud(
+                order_request.user_id,
+                cantidades,
+                direccion,
+                order_request.payment_method_id
+            )
+
+        else:
+            huella = None
+
         productos_ids = sorted({
             producto_id
             for producto_id, _ in cantidades
@@ -344,12 +453,41 @@ class PedidosApiImpl(BasePedidosApi):
 
         with SessionLocal() as db:
             try:
+                # Si la clave ya existe, resolver el reintento
+                # antes de consultar o descontar inventario.
+                if idempotency_key is not None:
+                    repetido = comprobar_reintento(
+                        db,
+                        order_request.user_id,
+                        idempotency_key,
+                        huella
+                    )
+
+                    if repetido is not None:
+                        return repetido
+
+                # Bloquear productos para coordinar
+                # compras simultaneas.
                 productos = db.scalars(
                     select(ProductDB)
                     .where(ProductDB.id.in_(productos_ids))
                     .order_by(ProductDB.id)
                     .with_for_update()
                 ).all()
+
+                # Otra compra con la misma clave podria
+                # haberse confirmado mientras esperabamos
+                # a obtener los bloqueos de inventario.
+                if idempotency_key is not None:
+                    repetido = comprobar_reintento(
+                        db,
+                        order_request.user_id,
+                        idempotency_key,
+                        huella
+                    )
+
+                    if repetido is not None:
+                        return repetido
 
                 productos_por_id = {
                     producto.id: producto
@@ -429,6 +567,8 @@ class PedidosApiImpl(BasePedidosApi):
                     payment_method_id=(
                         order_request.payment_method_id
                     ),
+                    idempotency_key=idempotency_key,
+                    request_fingerprint=huella,
                     total_price=total,
                     status="pending",
                     items=articulos_pedido
@@ -440,6 +580,25 @@ class PedidosApiImpl(BasePedidosApi):
                 pedido = obtener_pedido(db, pedido.id)
 
                 return convertir_pedido(pedido)
+
+            except IntegrityError:
+                # Una solicitud simultanea podria haber
+                # insertado antes la misma clave.
+                # Revertimos cualquier descuento de stock.
+                db.rollback()
+
+                if idempotency_key is not None:
+                    repetido = comprobar_reintento(
+                        db,
+                        order_request.user_id,
+                        idempotency_key,
+                        huella
+                    )
+
+                    if repetido is not None:
+                        return repetido
+
+                raise
 
             except Exception:
                 db.rollback()
