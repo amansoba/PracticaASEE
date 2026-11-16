@@ -9,6 +9,7 @@ y validacion de acceso mediante QR.
 """
 
 from fastapi import FastAPI
+from openapi_server.lifecycle import lifespan
 
 from openapi_server.apis.eventos_api import (
     router as EventosApiRouter
@@ -25,6 +26,7 @@ from openapi_server.apis.validacion_entradas_api import (
 
 
 app = FastAPI(
+    lifespan=lifespan,
     title="API de Gestion de Eventos - Subsonic Festival",
     description=(
         "API responsable de festivales, programacion, "
@@ -39,3 +41,7 @@ app.include_router(EventosApiRouter)
 app.include_router(LineUpApiRouter)
 app.include_router(PasesYEntradasApiRouter)
 app.include_router(ValidacionEntradasApiRouter)
+
+
+from openapi_server.health import router as health_router
+app.include_router(health_router)

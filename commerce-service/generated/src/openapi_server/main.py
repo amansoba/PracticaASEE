@@ -6,6 +6,7 @@ import logging
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from openapi_server.lifecycle import lifespan as database_lifespan
 
 from openapi_server.apis.pedidos_api import (
     router as PedidosApiRouter
@@ -62,20 +63,21 @@ async def revisar_pedidos_periodicamente():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
-    tarea_expiracion = asyncio.create_task(
-        revisar_pedidos_periodicamente()
-    )
-
-    try:
-        yield
-
-    finally:
-        tarea_expiracion.cancel()
+    async with database_lifespan(app):
+        tarea_expiracion = asyncio.create_task(
+            revisar_pedidos_periodicamente()
+        )
 
         try:
-            await tarea_expiracion
-        except asyncio.CancelledError:
-            pass
+            yield
+
+        finally:
+            tarea_expiracion.cancel()
+
+            try:
+                await tarea_expiracion
+            except asyncio.CancelledError:
+                pass
 
 
 # ============================================================
@@ -83,6 +85,7 @@ async def lifespan(app: FastAPI):
 # ============================================================
 
 app = FastAPI(
+    lifespan=lifespan,
     title="API de Tienda y Merchandising - Subsonic Festival",
     description=(
         "API responsable de productos, inventario, "
@@ -90,10 +93,13 @@ app = FastAPI(
         "y administracion de compras."
     ),
     version="1.1.0",
-    lifespan=lifespan
 )
 
 
 app.include_router(PedidosApiRouter)
 app.include_router(ProductosApiRouter)
 app.include_router(AdministracionPedidosApiRouter)
+
+
+from openapi_server.health import router as health_router
+app.include_router(health_router)

@@ -23,29 +23,29 @@ test.describe("flujos E2E de administrador", () => {
 
     await page.goto(catalogPath);
     const nombre = `Artista E2E ${Date.now()}`;
-    await page.getByLabel("Nombre").fill(nombre);
-    await page.getByLabel("Género").fill("E2E");
+    await page.getByLabel("Nombre", { exact: true }).fill(nombre);
+    await page.getByLabel("Género", { exact: true }).fill("E2E");
     await page.getByRole("button", { name: "Crear artista" }).click();
-    await expect(page.getByRole("status")).toContainText("creado");
+    await expect(page.getByRole("status").filter({ hasText: "creado" })).toBeVisible();
     await page.getByLabel("Buscar por nombre").fill(nombre);
     await expect(page.getByText(nombre)).toBeVisible();
     await page.getByRole("button", { name: "Editar" }).click();
-    await page.getByLabel("Nombre").fill(`${nombre} editado`);
+    await page.getByLabel("Nombre", { exact: true }).fill(`${nombre} editado`);
     await page.getByRole("button", { name: "Guardar cambios" }).click();
-    await expect(page.getByRole("status")).toContainText("actualizado");
+    await expect(page.getByRole("status").filter({ hasText: "actualizado" })).toBeVisible();
     page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "Eliminar" }).click();
-    await expect(page.getByRole("status")).toContainText("eliminado");
+    await expect(page.getByRole("status").filter({ hasText: "eliminado" })).toBeVisible();
 
     await page.goto(commercePath);
-    await page.getByLabel("Nombre").fill(`Producto E2E ${Date.now()}`);
-    await page.getByLabel("Categoría").fill("e2e");
-    await page.getByLabel("Precio").fill("12.50");
-    await page.getByLabel("Nueva talla").fill("M");
-    await page.getByLabel("Nuevo stock").fill("5");
+    await page.getByLabel("Nombre", { exact: true }).fill(`Producto E2E ${Date.now()}`);
+    await page.getByLabel("Categoría", { exact: true }).fill("e2e");
+    await page.getByLabel("Precio", { exact: true }).fill("12.50");
+    await page.getByLabel("Nueva talla", { exact: true }).fill("M");
+    await page.getByLabel("Nuevo stock", { exact: true }).fill("5");
     await page.getByRole("button", { name: "Añadir variante" }).click();
     await page.getByRole("button", { name: "Guardar producto" }).click();
-    await expect(page.getByRole("status")).toContainText("creado");
+    await expect(page.getByRole("status").filter({ hasText: "creado" })).toBeVisible();
 
     await page.goto(providersPath);
     const evento = page.getByLabel("Evento");
@@ -78,16 +78,17 @@ test.describe("flujos E2E de proveedor", () => {
       await page.getByLabel("service_category").fill("Sonido");
       await page.getByLabel("contact_email").fill(process.env.E2E_PROVIDER_EMAIL!);
       await registrar.click();
-      await expect(page.getByRole("status")).toContainText("registrada");
+      await expect(page.getByRole("status").filter({ hasText: "registrada" })).toBeVisible();
     }
 
     const evento = page.getByLabel("Evento");
     await evento.selectOption({ index: 1 });
     const espacio = page.getByLabel("Espacio");
-    await expect(espacio.locator("option").nth(1)).toBeVisible();
+    await expect(espacio).toBeEnabled();
+    await expect(espacio.locator("option").nth(1)).toBeAttached();
     await espacio.selectOption({ index: 1 });
     await page.getByLabel("Presupuesto").fill("100");
     await page.getByRole("button", { name: "Enviar propuesta" }).click();
-    await expect(page.getByRole("status")).toContainText("enviada");
+    await expect(page.getByRole("status").filter({ hasText: "enviada" })).toBeVisible();
   });
 });

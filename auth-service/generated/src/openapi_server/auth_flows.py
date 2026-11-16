@@ -160,6 +160,8 @@ def token_usuario_invalidado(payload: dict) -> bool:
         if registro is None:
             return False
 
+        # JWT iat has second precision. Keep equality invalidated so a token
+        # issued in the reset second cannot escape revocation.
         return emitido_en <= fecha_utc(
             registro.invalid_before
         )

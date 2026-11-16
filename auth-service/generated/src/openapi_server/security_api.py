@@ -9,7 +9,6 @@ from openapi_server.models.extra_models import TokenModel
 from openapi_server.auth_security import verificar_token
 from openapi_server.database import SessionLocal
 from openapi_server.db_models import UserDB
-from openapi_server.auth_flows import token_revocado
 from openapi_server.auth_flows import (
     token_revocado,
     token_usuario_invalidado
@@ -42,7 +41,6 @@ def get_token_BearerAuth(
             headers={"WWW-Authenticate": "Bearer"}
         )
 
-    # AQUI VA EL BLOQUE NUEVO
     if token_usuario_invalidado(payload):
         raise HTTPException(
             status_code=401,

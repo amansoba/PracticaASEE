@@ -9,6 +9,7 @@ alquilables, solicitudes y presupuestos.
 """
 
 from fastapi import FastAPI
+from openapi_server.lifecycle import lifespan
 
 from openapi_server.apis.presupuestos_y_solicitudes_api import (
     router as PresupuestosYSolicitudesApiRouter
@@ -28,6 +29,7 @@ from openapi_server.apis.administracion_servicios_espacios_api import (
 
 
 app = FastAPI(
+    lifespan=lifespan,
     title="API de Gestion de Proveedores - Subsonic Festival",
     description=(
         "API responsable de la gestion de proveedores, "
@@ -42,3 +44,7 @@ app.include_router(PresupuestosYSolicitudesApiRouter)
 app.include_router(ProveedoresApiRouter)
 app.include_router(ServiciosYEspaciosApiRouter)
 app.include_router(AdministracionServiciosEspaciosApiRouter)
+
+
+from openapi_server.health import router as health_router
+app.include_router(health_router)

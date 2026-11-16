@@ -17,8 +17,8 @@ info:
       para permitir la asignación de espacios y servicios externos.
 
 servers:
-  - url: https://api.subsonic.com/events/v1
-    description: Servidor de desarrollo
+  - url: http://localhost:8002
+    description: Desarrollo local (Compose)
 
 tags:
   - name: Eventos
@@ -29,6 +29,46 @@ tags:
     description: Configuración de tipos de pase, venta y consulta de entradas de usuarios
 
 paths:
+  /health:
+    get:
+      tags:
+      - Health
+      operationId: health
+      summary: Liveness
+      responses:
+        '200':
+          description: Process alive
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /ready:
+    get:
+      tags:
+      - Health
+      operationId: ready
+      summary: Local database readiness
+      responses:
+        '200':
+          description: Local database available
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                properties:
+                  status:
+                    type: string
+                    example: ready
+        '503':
+          description: Local database unavailable
   /events:
     get:
       tags:
@@ -63,6 +103,8 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateEventRequest'
       responses:
+        '422':
+          description: Validation Error
         '201':
           description: Evento registrado exitosamente.
           content:
@@ -94,6 +136,8 @@ paths:
             type: string
           example: "evt_101"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Detalles del evento.
           content:
@@ -127,6 +171,8 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateEventRequest'
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Evento actualizado correctamente.
           content:
@@ -157,6 +203,8 @@ paths:
             type: string
           example: "evt_101"
       responses:
+        '422':
+          description: Validation Error
         '204':
           description: Evento eliminado satisfactoriamente.
         '401':
@@ -183,6 +231,8 @@ paths:
             type: string
           example: "evt_101"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Horarios y cartel devueltos con éxito.
           content:
@@ -225,6 +275,8 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateScheduleEntryRequest'
       responses:
+        '422':
+          description: Validation Error
         '201':
           description: Actuación añadida al cartel correctamente.
           content:
@@ -263,6 +315,8 @@ paths:
             type: string
           example: "evt_101"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Tipos de pases configurados.
           content:
@@ -298,6 +352,8 @@ paths:
             schema:
               $ref: '#/components/schemas/CreatePassConfigRequest'
       responses:
+        '422':
+          description: Validation Error
         '201':
           description: Modalidad de pase dada de alta exitosamente.
           content:
@@ -334,6 +390,8 @@ paths:
             schema:
               $ref: '#/components/schemas/TicketPurchaseRequest'
       responses:
+        '422':
+          description: Validation Error
         '201':
           description: Entrada emitida y asociada exitosamente al usuario.
           content:
@@ -374,6 +432,8 @@ paths:
             type: string
           example: "usr_555"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Entradas del usuario.
           content:
@@ -413,6 +473,8 @@ paths:
                   minLength: 1
                   maxLength: 200
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Entrada validada correctamente.
           content:
@@ -524,6 +586,7 @@ components:
             de Catálogo Musical y se utiliza como referencia foránea.
           example: "art_12345"
         artist_name:
+          nullable: true
           type: string
           description: Nombre del artista para visualización rápida.
           example: "Daft Punk"
@@ -560,6 +623,7 @@ components:
           description: Referencia foránea hacia el artista en Catálogo Musical.
           example: "art_12345"
         artist_name:
+          nullable: true
           type: string
           description: Nombre del artista.
           example: "Daft Punk"
@@ -599,6 +663,7 @@ components:
           description: Aforo total reservado para este tipo de pase.
           example: 5000
         benefits:
+          nullable: true
           type: array
           description: Ventajas asociadas al pase.
           items:
@@ -641,6 +706,7 @@ components:
           description: Entradas restantes disponibles para venta.
           example: 4890
         benefits:
+          nullable: true
           type: array
           description: Beneficios incluidos.
           items:
@@ -669,6 +735,7 @@ components:
             Autenticación y Cuentas y se utiliza para asociar la propiedad de la entrada.
           example: "usr_555"
         payment_token:
+          nullable: true
           type: string
           description: Token de pasarela de pago para confirmar la transacción.
           example: "tok_visa_4242"

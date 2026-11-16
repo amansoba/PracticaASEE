@@ -15,3 +15,6 @@ __pycache__/
 # Pruebas
 .pytest_cache/
 .coverage
+!.env.test.example
+
+pytest-cache-files-*/

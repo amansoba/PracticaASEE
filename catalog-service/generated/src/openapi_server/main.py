@@ -9,6 +9,7 @@ musicales con integracion de Spotify.
 """
 
 from fastapi import FastAPI
+from openapi_server.lifecycle import lifespan
 
 from openapi_server.apis.artistas_api import (
     router as ArtistasApiRouter
@@ -24,6 +25,7 @@ from openapi_server.apis.administracion_canciones_api import (
 
 
 app = FastAPI(
+    lifespan=lifespan,
     title="API de Catalogo Musical - Subsonic Festival",
     description=(
         "API para la gestion de artistas, canciones, "
@@ -36,3 +38,7 @@ app = FastAPI(
 app.include_router(ArtistasApiRouter)
 app.include_router(CancionesApiRouter)
 app.include_router(AdministracionCancionesApiRouter)
+
+
+from openapi_server.health import router as health_router
+app.include_router(health_router)

@@ -209,6 +209,8 @@ class AutenticacinApiImpl(BaseAutenticacinApi):
     # CIERRE DE SESION
     # ========================================================
 
+    # POST /auth/logout
+    # Revocar el JWT utilizado para cerrar la sesion
     async def logout_user(
         self,
         token: str
