@@ -30,3 +30,45 @@ export const crearPropuesta = (datos: DatosPropuesta, token: string) => request<
 export const obtenerMisPropuestas = (providerId: string, token: string) => request<PropuestaProveedor[]>(`/requests/provider/${encodeURIComponent(providerId)}`, token);
 export type { Evento };
 export type { PropuestaProveedor };
+
+export const actualizarServicio = (
+  id: string,
+  datos: DatosServicio,
+  token: string
+) =>
+  request<ServicioExterno>(
+    `/external-services/${encodeURIComponent(id)}`,
+    token,
+    { method: "PUT", body: JSON.stringify(datos) }
+  );
+
+export const eliminarServicio = (
+  id: string,
+  token: string
+) =>
+  request<void>(
+    `/external-services/${encodeURIComponent(id)}`,
+    token,
+    { method: "DELETE" }
+  );
+
+export const actualizarEspacio = (
+  id: string,
+  datos: DatosEspacio,
+  token: string
+) =>
+  request<Espacio>(
+    `/spaces/${encodeURIComponent(id)}`,
+    token,
+    { method: "PUT", body: JSON.stringify(datos) }
+  );
+
+export const eliminarEspacio = (
+  id: string,
+  token: string
+) =>
+  request<void>(
+    `/spaces/${encodeURIComponent(id)}`,
+    token,
+    { method: "DELETE" }
+  );
