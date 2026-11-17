@@ -26,3 +26,26 @@ async function request<T>(path: string, token?: string, init?: RequestInit): Pro
 
 export const obtenerCanciones = (artistId: string) => request<Cancion[]>(`/artists/${encodeURIComponent(artistId)}/songs`);
 export const crearCancion = (artistId: string, datos: DatosCancion, token: string) => request<Cancion>(`/artists/${encodeURIComponent(artistId)}/songs`, token, { method: "POST", body: JSON.stringify(datos) });
+
+export const actualizarCancion = (
+  artistId: string,
+  songId: string,
+  datos: DatosCancion,
+  token: string
+) =>
+  request<Cancion>(
+    `/artists/${encodeURIComponent(artistId)}/songs/${encodeURIComponent(songId)}`,
+    token,
+    { method: "PUT", body: JSON.stringify(datos) }
+  );
+
+export const eliminarCancion = (
+  artistId: string,
+  songId: string,
+  token: string
+) =>
+  request<void>(
+    `/artists/${encodeURIComponent(artistId)}/songs/${encodeURIComponent(songId)}`,
+    token,
+    { method: "DELETE" }
+  );

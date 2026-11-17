@@ -5,9 +5,16 @@ import {
   actualizarArtista, crearArtista, eliminarArtista, obtenerArtistas,
   type Artista, type DatosArtista,
 } from "../services/artistas";
+
 import {
-  crearCancion, obtenerCanciones, type Cancion, type DatosCancion,
+  actualizarCancion,
+  crearCancion,
+  eliminarCancion,
+  obtenerCanciones,
+  type Cancion,
+  type DatosCancion,
 } from "../services/catalogoAdmin";
+
 
 const artistaInicial: DatosArtista = { name: "", genre: "", biography: "", image_url: "" };
 const cancionInicial: DatosCancion = { title: "", spotify_id: "", spotify_url: "", preview_url: "" };
@@ -26,6 +33,7 @@ export default function AdministracionCatalogo() {
   const [artistaCanciones, setArtistaCanciones] = useState<string | null>(null);
   const [canciones, setCanciones] = useState<Cancion[]>([]);
   const [cancionForm, setCancionForm] = useState<DatosCancion>(cancionInicial);
+  const [cancionEditada, setCancionEditada] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
   const [cargandoCanciones, setCargandoCanciones] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -106,6 +114,8 @@ export default function AdministracionCatalogo() {
 
   async function cargarCanciones(artistId: string) {
     setArtistaCanciones(artistId);
+    setCancionEditada(null);
+    setCancionForm(cancionInicial);
     setCargandoCanciones(true);
     setError("");
     try {
@@ -137,9 +147,26 @@ export default function AdministracionCatalogo() {
         ...(cancionForm.spotify_url?.trim() ? { spotify_url: cancionForm.spotify_url.trim() } : {}),
         ...(cancionForm.preview_url?.trim() ? { preview_url: cancionForm.preview_url.trim() } : {}),
       };
+      
+    if (cancionEditada) {
+      await actualizarCancion(
+        artistaCanciones,
+        cancionEditada,
+        datos,
+        token
+      );
+    } else {
       await crearCancion(artistaCanciones, datos, token);
-      setCancionForm(cancionInicial);
-      setMensaje("Canción creada correctamente.");
+    }
+
+    setCancionForm(cancionInicial);
+    setMensaje(
+      cancionEditada
+        ? "Canción actualizada correctamente."
+        : "Canción creada correctamente."
+    );
+    setCancionEditada(null);
+
       await cargarCanciones(artistaCanciones);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear la canción.");
@@ -147,6 +174,38 @@ export default function AdministracionCatalogo() {
       setGuardando(false);
     }
   }
+
+
+async function borrarCancion(songId: string) {
+  if (
+    !token ||
+    !artistaCanciones ||
+    !window.confirm("¿Seguro que quieres eliminar esta canción?")
+  ) {
+    return;
+  }
+
+  limpiarMensajes();
+
+  try {
+    await eliminarCancion(artistaCanciones, songId, token);
+
+    if (cancionEditada === songId) {
+      setCancionEditada(null);
+      setCancionForm(cancionInicial);
+    }
+
+    setMensaje("Canción eliminada correctamente.");
+    await cargarCanciones(artistaCanciones);
+  } catch (err) {
+    setError(
+      err instanceof Error
+        ? err.message
+        : "No se pudo eliminar la canción."
+    );
+  }
+}
+
 
   if (!usuario || usuario.role !== "admin" || !token) {
     return <main className="pagina-eventos"><h1>Administración de catálogo</h1><p role="alert">Se requieren permisos de administrador.</p></main>;
@@ -173,7 +232,138 @@ export default function AdministracionCatalogo() {
         <div className="admin-filtros"><label>Buscar por nombre<input value={busqueda} onChange={(event) => setBusqueda(event.target.value)} /></label><label>Filtrar por género<input value={genero} onChange={(event) => setGenero(event.target.value)} /></label></div>
         {cargando ? <p role="status">Cargando artistas...</p> : artistas.length === 0 ? <p>No hay artistas que coincidan con los filtros.</p> : <div className="admin-tabla">{artistas.map((artista) => <article className="evento-card" key={artista.id}><div className="evento-card-contenido"><h3>{artista.name}</h3><p>{artista.genre}</p><button type="button" onClick={() => { setArtistaEditado(artista.id); setArtistaForm({ name: artista.name, genre: artista.genre, biography: artista.biography, image_url: artista.image_url }); }}>Editar</button>{" "}<button type="button" onClick={() => void borrarArtista(artista.id)}>Eliminar</button>{" "}<button type="button" onClick={() => void cargarCanciones(artista.id)}>Canciones</button></div></article>)}</div>}
       </section>
-      {artistaCanciones && <section className="admin-seccion"><h2>Canciones</h2><form className="admin-form" onSubmit={(event) => void guardarCancion(event)}><label>Título<input required value={cancionForm.title} onChange={(event) => setCancionForm({ ...cancionForm, title: event.target.value })} /></label><label>Spotify ID<input value={cancionForm.spotify_id ?? ""} onChange={(event) => setCancionForm({ ...cancionForm, spotify_id: event.target.value })} /></label><label>Spotify URL<input type="url" value={cancionForm.spotify_url ?? ""} onChange={(event) => setCancionForm({ ...cancionForm, spotify_url: event.target.value })} /></label><label>Preview URL<input type="url" value={cancionForm.preview_url ?? ""} onChange={(event) => setCancionForm({ ...cancionForm, preview_url: event.target.value })} /></label><button type="submit" disabled={guardando}>{guardando ? "Guardando..." : "Añadir canción"}</button></form>{cargandoCanciones ? <p role="status">Cargando canciones...</p> : canciones.length === 0 ? <p>No hay canciones para este artista.</p> : <ul>{canciones.map((cancion) => <li key={cancion.id}>{cancion.title}{cancion.spotify_url && <> · <a href={cancion.spotify_url}>Spotify</a></>}</li>)}</ul>}<small>El contrato actual no permite editar ni eliminar canciones.</small></section>}
+      
+{artistaCanciones && (
+  <section className="admin-seccion">
+    <h2>Canciones</h2>
+
+    <form
+      className="admin-form"
+      onSubmit={(event) => void guardarCancion(event)}
+    >
+      <label>
+        Título
+        <input
+          required
+          value={cancionForm.title}
+          onChange={(event) =>
+            setCancionForm({
+              ...cancionForm,
+              title: event.target.value,
+            })
+          }
+        />
+      </label>
+
+      <label>
+        Spotify ID
+        <input
+          value={cancionForm.spotify_id ?? ""}
+          onChange={(event) =>
+            setCancionForm({
+              ...cancionForm,
+              spotify_id: event.target.value,
+            })
+          }
+        />
+      </label>
+
+      <label>
+        Spotify URL
+        <input
+          type="url"
+          value={cancionForm.spotify_url ?? ""}
+          onChange={(event) =>
+            setCancionForm({
+              ...cancionForm,
+              spotify_url: event.target.value,
+            })
+          }
+        />
+      </label>
+
+      <label>
+        Preview URL
+        <input
+          type="url"
+          value={cancionForm.preview_url ?? ""}
+          onChange={(event) =>
+            setCancionForm({
+              ...cancionForm,
+              preview_url: event.target.value,
+            })
+          }
+        />
+      </label>
+
+      <button type="submit" disabled={guardando}>
+        {guardando
+          ? "Guardando..."
+          : cancionEditada
+            ? "Guardar canción"
+            : "Añadir canción"}
+      </button>
+
+      {cancionEditada && (
+        <button
+          type="button"
+          onClick={() => {
+            setCancionEditada(null);
+            setCancionForm(cancionInicial);
+          }}
+        >
+          Cancelar edición
+        </button>
+      )}
+    </form>
+
+    {cargandoCanciones ? (
+      <p role="status">Cargando canciones...</p>
+    ) : canciones.length === 0 ? (
+      <p>No hay canciones para este artista.</p>
+    ) : (
+      <ul>
+        {canciones.map((cancion) => (
+          <li key={cancion.id}>
+            {cancion.title}
+
+            {cancion.spotify_url && (
+              <>
+                {" "}·{" "}
+                <a href={cancion.spotify_url}>Spotify</a>
+              </>
+            )}
+
+            {" "}
+            <button
+              type="button"
+              onClick={() => {
+                setCancionEditada(cancion.id);
+                setCancionForm({
+                  title: cancion.title,
+                  spotify_id: cancion.spotify_id ?? "",
+                  spotify_url: cancion.spotify_url ?? "",
+                  preview_url: cancion.preview_url ?? "",
+                });
+              }}
+            >
+              Editar canción
+            </button>
+
+            {" "}
+            <button
+              type="button"
+              onClick={() => void borrarCancion(cancion.id)}
+            >
+              Eliminar canción
+            </button>
+          </li>
+        ))}
+      </ul>
+    )}
+  </section>
+)}
+
     </main>
   );
 }
