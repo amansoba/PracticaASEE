@@ -1,4 +1,3 @@
-
 import { useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { iniciarSesion } from "../services/auth";
@@ -84,11 +83,14 @@ function Login() {
         )}
 
         <button type="submit" disabled={cargando}>
-          {cargando ? "Iniciando sesión..." : "Entrar"}
+          {cargando ? "Iniciando..." : "Entrar"}
         </button>
 
         <p className="registro-enlace">
           ¿No tienes cuenta? <Link to="/registro">Regístrate</Link>
+        </p>
+        <p className="registro-enlace">
+          <Link to="/recuperar-contrasena">¿Has olvidado tu contraseña?</Link>
         </p>
       </form>
     </main>

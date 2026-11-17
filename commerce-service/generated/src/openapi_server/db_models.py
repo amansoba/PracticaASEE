@@ -154,6 +154,19 @@ class OrderDB(Base):
         nullable=True
     )
 
+    # Clave opcional enviada por el comprador para
+    # identificar reintentos de una misma compra.
+    idempotency_key: Mapped[str | None] = mapped_column(
+        String(128),
+        nullable=True
+    )
+
+    # Huella de los datos de la compra original.
+    request_fingerprint: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True
+    )
+
     total_price: Mapped[Decimal] = mapped_column(
         Numeric(12, 2),
         nullable=False
@@ -177,6 +190,11 @@ class OrderDB(Base):
     )
 
     __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "idempotency_key",
+            name="uq_orders_user_idempotency_key"
+        ),
         CheckConstraint(
             "total_price >= 0",
             name="ck_orders_total_nonnegative"

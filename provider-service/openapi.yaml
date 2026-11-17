@@ -15,8 +15,8 @@ info:
       información de fechas y recintos del festival al cual se asigna un espacio o servicio.
 
 servers:
-  - url: https://api.subsonic.com/providers/v1
-    description: Servidor de desarrollo
+  - url: http://localhost:8005
+    description: Desarrollo local (Compose)
 
 tags:
   - name: Proveedores
@@ -27,6 +27,46 @@ tags:
     description: Flujo de presupuestos, propuestas y asignación a festivales
 
 paths:
+  /health:
+    get:
+      tags:
+      - Health
+      operationId: health
+      summary: Liveness
+      responses:
+        '200':
+          description: Process alive
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /ready:
+    get:
+      tags:
+      - Health
+      operationId: ready
+      summary: Local database readiness
+      responses:
+        '200':
+          description: Local database available
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                properties:
+                  status:
+                    type: string
+                    example: ready
+        '503':
+          description: Local database unavailable
   /providers:
     get:
       tags:
@@ -38,6 +78,8 @@ paths:
       security:
         - BearerAuth: []
       responses:
+        '503':
+          description: Autenticacion no disponible
         '200':
           description: Lista de proveedores obtenida correctamente.
           content:
@@ -74,6 +116,12 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateProviderRequest'
       responses:
+        '403':
+          description: Sin permisos de proveedor
+        '409':
+          description: Proveedor duplicado
+        '422':
+          description: Validation Error
         '201':
           description: Proveedor registrado exitosamente.
           content:
@@ -140,6 +188,10 @@ paths:
             type: string
           example: "prov_001"
       responses:
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '200':
           description: Detalle del proveedor encontrado.
           content:
@@ -185,6 +237,12 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateExternalServiceRequest'
       responses:
+        '400':
+          description: Datos invalidos
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '201':
           description: Servicio externo creado.
           content:
@@ -215,6 +273,10 @@ paths:
             type: string
           example: "evt_101"
       responses:
+        '400':
+          description: Evento no valido
+        '422':
+          description: Validation Error
         '200':
           description: Lista de espacios devuelta con éxito.
           content:
@@ -247,6 +309,12 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateSpaceRequest'
       responses:
+        '400':
+          description: Datos invalidos
+        '409':
+          description: Espacio duplicado
+        '422':
+          description: Validation Error
         '201':
           description: Espacio publicado exitosamente.
           content:
@@ -289,6 +357,12 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateSpaceProposalRequest'
       responses:
+        '403':
+          description: Proveedor sin permisos
+        '409':
+          description: Conflicto de propuesta o espacio
+        '422':
+          description: Validation Error
         '201':
           description: Propuesta enviada correctamente.
           content:
@@ -326,6 +400,12 @@ paths:
             type: string
           example: "prov_001"
       responses:
+        '404':
+          description: Proveedor inexistente
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '200':
           description: Historial de propuestas del proveedor.
           content:
@@ -359,6 +439,10 @@ paths:
             type: string
           example: "evt_101"
       responses:
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '200':
           description: Lista de propuestas a evaluar.
           content:
@@ -407,6 +491,14 @@ paths:
                   description: Estado de asignación del presupuesto.
                   example: "approved"
       responses:
+        '400':
+          description: Estado incorrecto
+        '409':
+          description: Conflicto de adjudicacion
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '200':
           description: Estado del presupuesto actualizado.
         '401':
@@ -415,6 +507,142 @@ paths:
           description: Requiere rol de administrador.
         '404':
           description: La propuesta indicada no existe.
+
+  /external-services/{id}:
+    put:
+      tags:
+        - Servicios y Espacios
+      summary: Actualizar servicio externo
+      operationId: updateExternalService
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExternalServiceRequest'
+      responses:
+        '422':
+          description: Validation Error
+        '200':
+          description: Servicio actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalService'
+        '400':
+          description: Datos invalidos.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Se requiere administrador.
+        '404':
+          description: Servicio no encontrado.
+        '503':
+          description: Autenticacion no disponible.
+    delete:
+      tags:
+        - Servicios y Espacios
+      summary: Eliminar servicio externo
+      operationId: deleteExternalService
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '422':
+          description: Validation Error
+        '204':
+          description: Servicio eliminado.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Se requiere administrador.
+        '404':
+          description: Servicio no encontrado.
+        '503':
+          description: Autenticacion no disponible.
+
+  /spaces/{id}:
+    put:
+      tags:
+        - Servicios y Espacios
+      summary: Actualizar un espacio alquilable
+      operationId: updateSpace
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSpaceRequest'
+      responses:
+        '422':
+          description: Validation Error
+        '200':
+          description: Espacio actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Space'
+        '400':
+          description: Datos invalidos.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Se requiere administrador.
+        '404':
+          description: Espacio o evento no encontrado.
+        '409':
+          description: Conflicto con espacios o propuestas.
+        '503':
+          description: Servicio externo no disponible.
+    delete:
+      tags:
+        - Servicios y Espacios
+      summary: Eliminar un espacio
+      operationId: deleteSpace
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '422':
+          description: Validation Error
+        '204':
+          description: Espacio eliminado.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Se requiere administrador.
+        '404':
+          description: Espacio no encontrado.
+        '409':
+          description: El espacio tiene propuestas.
+        '503':
+          description: Autenticacion no disponible.
 
 components:
   securitySchemes:
@@ -487,6 +715,7 @@ components:
           description: Categoría de servicio principal.
           example: "Sonido"
         contact_email:
+          nullable: true
           type: string
           format: email
           description: Email de contacto.
@@ -502,6 +731,7 @@ components:
           description: Nombre del tipo de servicio externo.
           example: "Instalación de Sonido Profesional"
         description:
+          nullable: true
           type: string
           description: Descripción de requerimientos técnicos del servicio.
           example: "Equipos de sonido de alta potencia para escenarios principales."
@@ -521,6 +751,7 @@ components:
           description: Nombre del tipo de servicio.
           example: "Instalación de Sonido Profesional"
         description:
+          nullable: true
           type: string
           description: Descripción técnica.
           example: "Equipos de sonido de alta potencia para escenarios principales."
@@ -543,6 +774,7 @@ components:
           description: Nombre descriptivo del espacio.
           example: "Escenario Principal - Zona de Sonido"
         dimensions:
+          nullable: true
           type: string
           description: Medidas y superficie del espacio disponible.
           example: "20m x 15m"
@@ -552,6 +784,7 @@ components:
           description: Tarifa base de alquiler del espacio en euros.
           example: 1200.00
         is_available:
+          nullable: true
           type: boolean
           description: Disponibilidad del espacio para alquiler.
           example: true
@@ -578,6 +811,7 @@ components:
           description: Nombre de la zona o espacio.
           example: "Escenario Principal - Zona de Sonido"
         dimensions:
+          nullable: true
           type: string
           description: Medidas del espacio.
           example: "20m x 15m"
@@ -619,6 +853,7 @@ components:
           description: Importe total presupuestado en euros.
           example: 1150.00
         setup_date:
+          nullable: true
           type: string
           format: date
           description: Fecha planificada de montaje en el recinto.
@@ -656,6 +891,7 @@ components:
           description: Presupuesto ofertado.
           example: 1150.00
         setup_date:
+          nullable: true
           type: string
           format: date
           description: Fecha de montaje propuesta.

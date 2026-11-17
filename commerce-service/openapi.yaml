@@ -13,8 +13,8 @@ info:
       que efectúa la compra existe, está activo y posee los permisos correspondientes.
 
 servers:
-  - url: https://api.subsonic.com/commerce/v1
-    description: Servidor de desarrollo
+  - url: http://localhost:8004
+    description: Desarrollo local (Compose)
 
 tags:
   - name: Productos
@@ -23,6 +23,46 @@ tags:
     description: Procesamiento de compras (checkout) y seguimiento de pedidos
 
 paths:
+  /health:
+    get:
+      tags:
+      - Health
+      operationId: health
+      summary: Liveness
+      responses:
+        '200':
+          description: Process alive
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /ready:
+    get:
+      tags:
+      - Health
+      operationId: ready
+      summary: Local database readiness
+      responses:
+        '200':
+          description: Local database available
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                properties:
+                  status:
+                    type: string
+                    example: ready
+        '503':
+          description: Local database unavailable
   /products:
     get:
       tags:
@@ -39,6 +79,8 @@ paths:
             type: string
           example: "ropa"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Lista de productos devuelta con éxito.
           content:
@@ -65,6 +107,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateProductRequest'
       responses:
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '201':
           description: Producto dado de alta satisfactoriamente.
           content:
@@ -95,6 +141,8 @@ paths:
             type: string
           example: "prod_001"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Producto encontrado.
           content:
@@ -128,6 +176,12 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateProductRequest'
       responses:
+        '400':
+          description: Datos invalidos
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '200':
           description: Producto actualizado correctamente.
           content:
@@ -158,6 +212,10 @@ paths:
             type: string
           example: "prod_001"
       responses:
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '204':
           description: Producto eliminado exitosamente.
         '401':
@@ -182,6 +240,17 @@ paths:
 
         Esto valida que el usuario existe y está autorizado a operar.
       operationId: createOrder
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: >
+            Identifica reintentos de una misma compra.
+            La misma clave y compra devuelve el pedido original.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
       security:
         - BearerAuth: []
       requestBody:
@@ -192,6 +261,10 @@ paths:
             schema:
               $ref: '#/components/schemas/OrderRequest'
       responses:
+        '403':
+          description: Comprador no autorizado
+        '422':
+          description: Validation Error
         '201':
           description: Pedido registrado exitosamente.
           content:
@@ -213,6 +286,31 @@ paths:
             No se pudo validar al usuario porque el microservicio de Autenticación y Cuentas
             no está disponible.
 
+    get:
+      tags:
+        - Pedidos
+      summary: Consultar todos los pedidos
+      description: >
+        Devuelve todos los pedidos registrados.
+        Operacion exclusiva para administradores.
+      operationId: listAllOrders
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Listado global de pedidos.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401':
+          description: No autenticado.
+        '403':
+          description: Se requiere administrador.
+        '503':
+          description: Autenticacion no disponible.
   /orders/user/{userId}:
     get:
       tags:
@@ -232,6 +330,8 @@ paths:
             type: string
           example: "usr_555"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Historial de pedidos devuelto correctamente.
           content:
@@ -264,6 +364,10 @@ paths:
             type: string
           example: "ord_112233"
       responses:
+        '403':
+          description: No autorizado
+        '422':
+          description: Validation Error
         '200':
           description: Detalle del pedido.
           content:
@@ -310,6 +414,14 @@ paths:
                   description: Estado de preparación o envío.
                   example: "shipped"
       responses:
+        '409':
+          description: Transicion de estado no permitida
+        '400':
+          description: Estado incorrecto
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '200':
           description: Estado del pedido modificado correctamente.
         '401':
@@ -318,6 +430,82 @@ paths:
           description: Acceso denegado. Requiere rol de administrador.
         '404':
           description: El pedido indicado no existe.
+
+  /orders/{id}/cancel:
+    post:
+      tags:
+        - Pedidos
+      summary: Cancelar un pedido propio pendiente
+      operationId: cancelOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '422':
+          description: Validation Error
+        '200':
+          description: Pedido cancelado correctamente.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Pedido de otro usuario.
+        '404':
+          description: Pedido no encontrado.
+        '409':
+          description: Pedido no cancelable.
+        '503':
+          description: Autenticacion no disponible.
+
+  /orders/{id}/pay:
+    post:
+      tags:
+        - Pedidos
+      summary: Simular el pago de un pedido
+      description: >
+        Pago simulado de desarrollo.
+        No realiza ningun cargo bancario real.
+      operationId: payOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - payment_token
+              properties:
+                payment_token:
+                  type: string
+      responses:
+        '200':
+          description: Pago simulado correctamente.
+        '400':
+          description: Token de pago rechazado.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Pedido de otro usuario.
+        '404':
+          description: Pedido no encontrado.
+        '409':
+          description: Pedido no pagable.
+        '422':
+          description: Datos incompletos.
+        '503':
+          description: Autenticacion no disponible.
 
 components:
   securitySchemes:
@@ -354,6 +542,7 @@ components:
           description: Nombre comercial del artículo.
           example: "Sudadera Oficial Subsonic 2026"
         description:
+          nullable: true
           type: string
           description: Descripción física del producto.
           example: "Sudadera con capucha y logotipo bordado."
@@ -367,6 +556,7 @@ components:
           description: Precio unitario en euros.
           example: 45.00
         images:
+          nullable: true
           type: array
           description: Lista de URLs de fotografías del producto.
           items:
@@ -374,6 +564,7 @@ components:
             format: uri
           example: ["https://api.subsonic.com/assets/hoodie1.jpg"]
         variants:
+          nullable: true
           type: array
           description: Variantes de inventario por talla.
           items:
@@ -396,6 +587,7 @@ components:
           description: Nombre del artículo.
           example: "Sudadera Oficial Subsonic 2026"
         description:
+          nullable: true
           type: string
           description: Descripción del producto.
           example: "Sudadera con capucha y logotipo bordado."
@@ -409,6 +601,7 @@ components:
           description: Precio en euros.
           example: 45.00
         images:
+          nullable: true
           type: array
           description: Fotografías promocionales.
           items:
@@ -416,6 +609,7 @@ components:
             format: uri
           example: ["https://api.subsonic.com/assets/hoodie1.jpg"]
         variants:
+          nullable: true
           type: array
           description: Variantes disponibles en stock.
           items:
@@ -471,6 +665,7 @@ components:
           description: Dirección física para la entrega del paquete.
           example: "Calle Mayor 12, 3B, 28001, Madrid"
         payment_method_id:
+          nullable: true
           type: string
           description: Token o identificador del método de pago utilizado.
           example: "pm_card_987"

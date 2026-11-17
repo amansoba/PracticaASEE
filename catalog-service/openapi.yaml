@@ -14,8 +14,8 @@ info:
     - Se integra de forma externa con la API pública de Spotify para metadatos y preescuchas.
 
 servers:
-  - url: https://api.subsonic.com/catalog/v1
-    description: Servidor de desarrollo
+  - url: http://localhost:8003
+    description: Desarrollo local (Compose)
 
 tags:
   - name: Artistas
@@ -24,6 +24,46 @@ tags:
     description: Catálogo de canciones y referencias externas de Spotify
 
 paths:
+  /health:
+    get:
+      tags:
+      - Health
+      operationId: health
+      summary: Liveness
+      responses:
+        '200':
+          description: Process alive
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /ready:
+    get:
+      tags:
+      - Health
+      operationId: ready
+      summary: Local database readiness
+      responses:
+        '200':
+          description: Local database available
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                properties:
+                  status:
+                    type: string
+                    example: ready
+        '503':
+          description: Local database unavailable
   /artists:
     get:
       tags:
@@ -47,6 +87,8 @@ paths:
             type: string
           example: "Daft"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Lista de artistas devuelta correctamente.
           content:
@@ -72,6 +114,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateArtistRequest'
       responses:
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '201':
           description: Artista creado exitosamente.
           content:
@@ -103,6 +149,8 @@ paths:
             type: string
           example: "art_12345"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Artista encontrado.
           content:
@@ -136,6 +184,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateArtistRequest'
       responses:
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '200':
           description: Artista actualizado correctamente.
           content:
@@ -166,6 +218,10 @@ paths:
             type: string
           example: "art_12345"
       responses:
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '204':
           description: Artista eliminado satisfactoriamente.
         '401':
@@ -192,6 +248,8 @@ paths:
             type: string
           example: "art_12345"
       responses:
+        '422':
+          description: Validation Error
         '200':
           description: Lista de canciones del artista.
           content:
@@ -227,6 +285,10 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateSongRequest'
       responses:
+        '422':
+          description: Validation Error
+        '503':
+          description: Autenticacion no disponible
         '201':
           description: Canción creada y vinculada correctamente.
           content:
@@ -241,6 +303,82 @@ paths:
           description: Acceso denegado.
         '404':
           description: El artista especificado no existe.
+
+  /artists/{artistId}/songs/{songId}:
+    put:
+      tags:
+        - Canciones
+      summary: Actualizar una cancion
+      operationId: updateSong
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: artistId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: songId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSongRequest'
+      responses:
+        '422':
+          description: Validation Error
+        '200':
+          description: Cancion actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Song'
+        '400':
+          description: Datos invalidos.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Se requiere administrador.
+        '404':
+          description: Artista o cancion no encontrados.
+        '503':
+          description: Autenticacion no disponible.
+    delete:
+      tags:
+        - Canciones
+      summary: Eliminar una cancion
+      operationId: deleteSong
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: artistId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: songId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '422':
+          description: Validation Error
+        '204':
+          description: Cancion eliminada.
+        '401':
+          description: No autenticado.
+        '403':
+          description: Se requiere administrador.
+        '404':
+          description: Artista o cancion no encontrados.
+        '503':
+          description: Autenticacion no disponible.
 
 components:
   securitySchemes:
@@ -265,10 +403,12 @@ components:
           description: Género musical principal.
           example: "Electrónica"
         biography:
+          nullable: true
           type: string
           description: Reseña biográfica del artista.
           example: "Dúo francés de música electrónica formado en 1993..."
         image_url:
+          nullable: true
           type: string
           format: uri
           description: URL oficial de la imagen del artista.
@@ -294,10 +434,12 @@ components:
           description: Género musical.
           example: "Electrónica"
         biography:
+          nullable: true
           type: string
           description: Biografía del artista.
           example: "Dúo francés de música electrónica formado en 1993..."
         image_url:
+          nullable: true
           type: string
           format: uri
           description: Enlace a la fotografía promocional.
@@ -313,15 +455,18 @@ components:
           description: Título de la pista musical.
           example: "Get Lucky"
         spotify_id:
+          nullable: true
           type: string
           description: Identificador de la pista en Spotify. El dato pertenece a Spotify API.
           example: "2Foc5Q5nqNiosCNqttzNZB"
         spotify_url:
+          nullable: true
           type: string
           format: uri
           description: Enlace de reproducción directo en Spotify.
           example: "https://open.spotify.com/track/2Foc5Q5nqNiosCNqttzNZB"
         preview_url:
+          nullable: true
           type: string
           format: uri
           description: URL con fragmento de preescucha musical (30s).
@@ -347,15 +492,18 @@ components:
           description: Título de la canción.
           example: "Get Lucky"
         spotify_id:
+          nullable: true
           type: string
           description: Identificador externo en Spotify.
           example: "2Foc5Q5nqNiosCNqttzNZB"
         spotify_url:
+          nullable: true
           type: string
           format: uri
           description: Enlace al reproductor web de Spotify.
           example: "https://open.spotify.com/track/2Foc5Q5nqNiosCNqttzNZB"
         preview_url:
+          nullable: true
           type: string
           format: uri
           description: Archivo de audio de preescucha.

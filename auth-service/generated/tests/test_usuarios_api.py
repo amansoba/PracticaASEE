@@ -241,3 +241,58 @@ def test_rol_desactualizado_invalida_token(client):
     )
 
     assert respuesta.status_code == 401
+
+
+def test_cliente_no_puede_consultar_perfil_ajeno(client):
+    # Registrar al primer usuario
+    registrar_usuario(client)
+    token_cliente = obtener_token(client)
+
+    # Registrar un segundo usuario
+    otro_usuario = {
+        "name": "Segundo Usuario",
+        "email": "segundo@subsonic.com",
+        "password": "SegundoSeguro123!",
+        "phone": "699111222"
+    }
+
+    usuario_ajeno = registrar_usuario(
+        client,
+        otro_usuario
+    )
+
+    # El primer usuario intenta consultar el perfil del segundo
+    respuesta = client.get(
+        f"/users/{usuario_ajeno['id']}",
+        headers=cabecera(token_cliente)
+    )
+
+    # Debe rechazarse el acceso
+    assert respuesta.status_code == 403
+
+
+def test_admin_puede_consultar_perfil_ajeno(client):
+    # Crear un usuario administrador
+    _, token_admin = crear_admin(client)
+
+    # Registrar otro usuario
+    otro_usuario = {
+        "name": "Segundo Usuario",
+        "email": "segundo@subsonic.com",
+        "password": "SegundoSeguro123!",
+        "phone": "699111222"
+    }
+
+    usuario_ajeno = registrar_usuario(
+        client,
+        otro_usuario
+    )
+
+    # El administrador consulta su perfil
+    respuesta = client.get(
+        f"/users/{usuario_ajeno['id']}",
+        headers=cabecera(token_admin)
+    )
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()["id"] == usuario_ajeno["id"]
