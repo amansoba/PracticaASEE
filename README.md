@@ -143,7 +143,7 @@ GitHub Actions comprueba backend con PostgreSQL 15, inicio/seed, contratos,
 lint y build del frontend, construcción y arranque de Compose y smoke HTTP.
 La Práctica 2 está integrada en la rama `main`. GitHub Actions ha ejecutado correctamente las comprobaciones de los cinco microservicios, las pruebas del frontend, la validación de contratos OpenAPI y el despliegue con Docker Compose.
 
-La integración cuenta con 253 pruebas de backend e inicialización y 19 pruebas de frontend superadas. Además, las dos pruebas E2E de administración y proveedores se ejecutaron correctamente durante la validación local de la integración. Estas últimas no forman parte del workflow de CI.
+La integración cuenta con 253 pruebas de backend e inicialización y 26 pruebas de frontend superadas. Además, las dos pruebas E2E de administración y proveedores se ejecutaron correctamente durante la validación local de la integración. Estas últimas no forman parte del workflow de CI.
 
 Los resultados de GitHub Actions pueden consultarse en la pestaña **Actions** del repositorio.
 

@@ -59,7 +59,7 @@ ni archivos sin resolver. La matriz actualizada está en [endpoints.md](endpoint
 | provider-service | 59 tests superados, incluida administración y adjudicación |
 | Inicialización y seed | 5 tests superados, uno por servicio; bases vacías, segunda ejecución y salud |
 | Backend e inicialización | **253 tests superados** |
-| Frontend Vitest | **19 tests superados** |
+| Frontend Vitest | **26 tests superados** (cifra actualizada tras los commits posteriores al merge) |
 | Frontend Playwright/Chromium | **2 E2E superados** tras la corrección autorizada |
 | Frontend lint y build | Correctos; lint se repitió sobre los selectores corregidos |
 | OpenAPI | Cinco contratos raíz y cinco copias correctos; 69 operaciones coinciden con FastAPI |
