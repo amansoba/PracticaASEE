@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import {
   obtenerPedido,
-  actualizarEstadoPedido,
+  cancelarPedido,
   type Pedido,
 } from "../services/tienda";
 
@@ -31,7 +31,7 @@ export default function PedidoDetalle() {
     if (!id) return;
     setError("");
     try {
-      await actualizarEstadoPedido(id, "cancelled");
+      await cancelarPedido(id);
       setMensaje("Pedido cancelado");
       const datos = await obtenerPedido(id);
       setPedido(datos);

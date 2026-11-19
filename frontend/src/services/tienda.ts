@@ -68,3 +68,7 @@ export async function actualizarEstadoPedido(
     status,
   });
 }
+
+export async function cancelarPedido(id: string): Promise<void> {
+  return api.post(`/api/tienda/orders/${encodeURIComponent(id)}/cancel`, {});
+}
