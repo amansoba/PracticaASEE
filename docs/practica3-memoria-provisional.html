@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Subsonic Festival · Memoria provisional de la Práctica 3</title>
+  <style>
+    :root { font: 10.5pt/1.38 "Segoe UI", Arial, sans-serif; color: #182539; }
+    body { margin: 0 auto; max-width: 175mm; }
+    h1 { font-size: 32pt; line-height: 1.1; }
+    h2 { font-size: 17pt; color: #135267; margin: .65em 0 .35em; }
+    h3 { font-size: 12pt; margin: .8em 0 .25em; }
+    p { margin: .45em 0 .65em; }
+    a { color: #135267; }
+    code, pre { font-family: Consolas, monospace; font-size: .92em; }
+    pre { padding: 2mm 3mm; background: #edf3f6; white-space: pre-wrap; }
+    table { width: 100%; border-collapse: collapse; margin: .7em 0; }
+    th, td { text-align: left; vertical-align: top; border-bottom: 1px solid #ccd8de; padding: 1.25mm 2mm; }
+    th { background: #edf3f6; }
+    figure { margin: .8em 0; }
+    figcaption { color: #40566b; font-size: .9em; }
+    .cover { padding: 47mm 0 0; border-top: 2mm solid #135267; }
+    .provisional { color: #854320; font-weight: 600; }
+    .sheet { display: flow-root; position: relative; min-height: 253mm; padding-bottom: 7mm; box-sizing: border-box; }
+    footer { position: absolute; bottom: 0; width: 100%; border-top: 1px solid #ccd8de; text-align: right; font-size: 9pt; color: #40566b; }
+    @page { size: A4; margin: 17mm; }
+    @media print {
+      .sheet { break-after: page; }
+      .sheet:last-child { break-after: auto; }
+      tr, figure, pre { break-inside: avoid; }
+      .configuration p { margin: .35em 0 .45em; }
+      .configuration h2 { margin: .45em 0 .25em; }
+      .configuration th, .configuration td { padding-block: .8mm; }
+    }
+  </style>
+</head>
+<body>
+  <section class="sheet cover">
+    <p>Arquitecturas de Servicios y Aplicaciones Empresariales</p>
+    <h1>Subsonic Festival</h1>
+    <h2>Práctica 3 · Despliegue con Docker</h2>
+    <p class="provisional">Memoria provisional</p>
+    <p>Equipo de trabajo: Julia, Óscar, Álvaro, Borja y Andrea</p>
+    <p>Coordinación de la memoria: Andrea</p>
+    <p>24 de noviembre de 2026</p>
+    <footer>1 / 6</footer>
+  </section>
+  <section class="sheet">
+    <h2>Índice</h2>
+    <table>
+      <tr><th>Apartados</th><th>Página</th></tr>
+      <tr><td><a href="#objetivos">1. Introducción y objetivos</a>, 2. Arquitectura general, 3. Tecnologías</td><td>2</td></tr>
+      <tr><td><a href="#contenedores">4. Configuración de contenedores</a> (4.1–4.5)</td><td>3</td></tr>
+      <tr><td><a href="#proveedores">4.6 Proveedores</a>, 5. PostgreSQL, 6. Docker Compose y 7. Redes</td><td>4</td></tr>
+      <tr><td><a href="#variables">8. Variables de entorno</a>, 9. Construcción y despliegue, 10. Pruebas</td><td>5</td></tr>
+      <tr><td><a href="#incidencias">11. Incidencias</a>, 12. Conclusiones, 13. Anexos y evidencias</td><td>6</td></tr>
+    </table>
+    <h2 id="objetivos">1. Introducción y objetivos</h2>
+    <p>La práctica empaqueta los componentes de Subsonic Festival y describe cómo ejecutarlos juntos. La implementación toma como referencia la Práctica 2 integrada en <code>main</code> (<code>2b868e1</code>). Esta edición documenta los cambios de Andrea y los archivos disponibles del resto del equipo.</p>
+    <h2>2. Arquitectura general</h2>
+    <p>El navegador recibe la SPA de Nginx. El mismo servidor dirige las peticiones de <code>/api/</code> a las cinco API. Cada API tiene su propia instancia PostgreSQL. Proveedores consulta autenticación para las operaciones protegidas y eventos para validar solicitudes vinculadas a un festival.</p>
+    <figure>
+      <pre>Navegador → Nginx + SPA → auth     → auth-db
+                        → catalog  → catalog-db
+                        → event    → event-db
+                        → commerce → commerce-db
+                        → provider → provider-db
+                            └── HTTP → auth y event</pre>
+      <figcaption>Figura 1. Servicios y bases de datos en la red backend de Compose.</figcaption>
+    </figure>
+    <h2>3. Tecnologías</h2>
+    <p>Docker y Compose gestionan las imágenes, contenedores, redes y volúmenes. Las API usan FastAPI sobre Uvicorn, con SQLAlchemy y Psycopg para PostgreSQL. React, TypeScript y Vite generan los archivos estáticos que sirve Nginx.</p>
+    <footer>2 / 6</footer>
+  </section>
+  <section class="sheet">
+    <h2 id="contenedores">4. Configuración de contenedores</h2>
+    <p>El Compose de <code>main</code> apunta a las imágenes genéricas de <code>infra/</code>. Las referencias siguientes identifican los Dockerfiles específicos revisados en las ramas de la Práctica 3.</p>
+    <h3>4.1 Autenticación · Julia</h3>
+    <p>En <code>main</code>, <code>infra/Dockerfile.backend</code> instala los requisitos con Python 3.14 y arranca la API por Uvicorn. Compose configura PostgreSQL, JWT y recuperación de contraseña a través del entorno. [PENDIENTE: Dockerfile final de Julia y evidencia de compilación, arranque y <code>/ready</code>].</p>
+    <h3>4.2 Catálogo · Óscar</h3>
+    <p><code>0298540</code> usa Python 3.14 slim, contexto raíz y copia los requisitos, <code>src</code> y <code>scripts/seed.py</code>. Compose configura la URL de autenticación y las credenciales opcionales de Spotify. [PENDIENTE: evidencia de construcción y consulta de catálogo — Óscar].</p>
+    <h3>4.3 Eventos · Álvaro</h3>
+    <p><code>9776972</code> usa Python 3.14 slim, contexto raíz y Uvicorn en 8000. El entorno apunta a PostgreSQL, autenticación y catálogo. <code>4b5beed</code> añade la documentación del servicio en su rama. [PENDIENTE: evidencia de arranque y comunicación entre servicios — Álvaro].</p>
+    <h3>4.4 Comercio · Borja</h3>
+    <p><code>a48b4a0</code> instala requisitos y copia <code>src</code> desde el contexto <code>commerce-service/generated</code>, con Python 3.14 slim. <code>c2ef77d</code> modifica los scripts de validación. [PENDIENTE: salidas de las pruebas de comercio y del despliegue — Borja].</p>
+    <h3>4.5 Frontend y Nginx · Óscar</h3>
+    <p><code>b422623</code> compila la SPA en <code>node:24-alpine</code> con <code>npm ci</code> y <code>npm run build</code>. La etapa <code>nginx:stable-alpine</code> sirve <code>dist</code>, aplica el fallback de la SPA y usa el DNS interno para resolver destinos de <code>/api/</code>. [PENDIENTE: captura de la SPA y verificación del proxy — Óscar].</p>
+    <figure>
+      <pre>WORKDIR /app/provider-service/generated
+COPY provider-service/generated/requirements.txt ./requirements.txt
+RUN python -m pip install --no-cache-dir -r requirements.txt
+COPY provider-service/generated/src ./src</pre>
+      <figcaption>Figura 2. Capas de dependencias y código del Dockerfile de proveedores.</figcaption>
+    </figure>
+    <footer>3 / 6</footer>
+  </section>
+  <section class="sheet configuration">
+    <h2 id="proveedores">4.6 Proveedores · Andrea</h2>
+    <p>La API gestiona perfiles de proveedores, servicios externos, espacios alquilables, solicitudes y presupuestos. Su Dockerfile usa <code>python:3.14-slim</code> y fija <code>/app/provider-service/generated</code> como directorio de trabajo. Instala <code>requirements.txt</code> antes de copiar el código para reutilizar la capa de dependencias. FastAPI y Pydantic sirven y validan la API, Uvicorn ejecuta el servidor, SQLAlchemy y <code>psycopg[binary]</code> acceden a la base de datos y HTTPX realiza las consultas entre servicios.</p>
+    <p><code>PYTHONPATH</code> apunta a <code>src</code>, <code>PYTHONDONTWRITEBYTECODE=1</code> desactiva la escritura de cachés de bytecode y <code>PYTHONUNBUFFERED=1</code> facilita la lectura inmediata de logs. La lista de inclusión del Dockerfile limita la copia a requisitos y código Python del servicio. Las pruebas y el seed se ejecutan por fuera de la imagen de la API.</p>
+    <p>El lifespan llama a <code>Base.metadata.create_all(bind=engine)</code>. <code>GET /health</code> comprueba el proceso HTTP. <code>GET /ready</code> ejecuta <code>SELECT 1</code> y devuelve 503 ante un error de PostgreSQL. La sonda del contenedor invoca esa misma ruta en <code>127.0.0.1:8000</code> con la biblioteca estándar. Las llamadas reales de negocio a autenticación y eventos se comprueban por separado.</p>
+    <h2>5. Bases de datos PostgreSQL</h2>
+    <p>Cinco instancias <code>postgres:15</code> escuchan en 5432. Los volúmenes <code>auth-data</code>, <code>catalog-data</code>, <code>event-data</code>, <code>commerce-data</code> y <code>provider-data</code> persisten los datos. <code>pg_isready</code> precede a los trabajos de seed.</p>
+    <h2>6. Docker Compose</h2>
+    <p>El Compose de <code>main</code> comparte la construcción genérica entre <code>provider</code> y <code>provider-seed</code>. En <code>efe37c0</code>, Álvaro ya especifica el contexto raíz y el Dockerfile nuevo para <code>provider</code>, con imagen y construcción separadas para <code>provider-seed</code>. Al integrar las ramas, conservar esta separación y aplicar la misma contraseña externa en <code>provider-db</code>, <code>provider-seed</code> y <code>provider</code>. [PENDIENTE: listado de contenedores del Compose integrado — Álvaro].</p>
+    <h2>7. Redes, puertos y dependencias</h2>
+    <table>
+      <tr><th>Servicio</th><th>Puerto interno</th><th>Puerto local publicado</th></tr>
+      <tr><td>auth</td><td>8000</td><td>8001</td></tr>
+      <tr><td>event</td><td>8000</td><td>8002</td></tr>
+      <tr><td>catalog</td><td>8000</td><td>8003</td></tr>
+      <tr><td>commerce</td><td>8000</td><td>8004</td></tr>
+      <tr><td>provider</td><td>8000</td><td>8005</td></tr>
+      <tr><td>frontend</td><td>80</td><td>5173</td></tr>
+      <tr><td>PostgreSQL (cinco instancias)</td><td>5432</td><td>Sin publicar</td></tr>
+    </table>
+    <p>Los puertos locales se vinculan a <code>127.0.0.1</code>. En <code>backend</code>, Docker resuelve los nombres de servicio. Compose espera a los seeds de ejecución única y a las sondas de las API requeridas antes de iniciar sus consumidores.</p>
+    <footer>4 / 6</footer>
+  </section>
+  <section class="sheet configuration">
+    <h2 id="variables">8. Variables de entorno de proveedores</h2>
+    <table>
+      <tr><th>Variable</th><th>Ejemplo Docker</th><th>Uso</th></tr>
+      <tr><td><code>DB_HOST</code></td><td><code>provider-db</code></td><td>DNS de PostgreSQL</td></tr>
+      <tr><td><code>DB_PORT</code></td><td><code>5432</code></td><td>Puerto de PostgreSQL</td></tr>
+      <tr><td><code>DB_NAME</code></td><td><code>subsonic_providers</code></td><td>Base de datos</td></tr>
+      <tr><td><code>DB_USER</code></td><td><code>subsonic</code></td><td>Usuario de conexión</td></tr>
+      <tr><td><code>DB_PASSWORD</code></td><td>Variable externa</td><td>Contraseña de conexión</td></tr>
+      <tr><td><code>AUTH_SERVICE_URL</code></td><td><code>http://auth:8000</code></td><td>Identidad, token y roles</td></tr>
+      <tr><td><code>EVENT_SERVICE_URL</code></td><td><code>http://event:8000</code></td><td>Consulta del evento por ID</td></tr>
+      <tr><td><code>SEED_PROVIDER_EMAIL</code></td><td><code>demo.provider@subsonic.example.com</code></td><td>Correo usado por el seed externo</td></tr>
+    </table>
+    <p><code>database.py</code> construye la URL mediante <code>URL.create</code>. Los clientes de autenticación y eventos leen sus URL del entorno, con valores de loopback para desarrollo local. <code>SEED_PROVIDER_EMAIL</code> puede pasarse por Compose y se consume en <code>scripts/seed.py</code>. El frontend accede por rutas relativas a Nginx. El archivo raíz <code>.env.example</code> identifica las variables de demo, JWT, SMTP y Spotify para los demás servicios.</p>
+    <h2>9. Construcción y despliegue</h2>
+    <p>Desde la raíz del repositorio, construir la imagen y comprobar sus dependencias instaladas.</p>
+    <pre>docker build -f provider-service/generated/Dockerfile -t subsonic-provider:test .
+docker run --rm subsonic-provider:test python -m pip check</pre>
+    <p>Tras integrar el Compose definitivo y configurar el entorno local, ejecutar <code>docker compose up -d --build --wait</code>. Consultar el estado con <code>docker compose ps -a</code> y los logs con <code>docker compose logs provider</code>. El frontend se abre en <code>http://localhost:5173</code>.</p>
+    <h2>10. Pruebas de funcionamiento</h2>
+    <p>El 24/11/2026 se construyó la imagen, que ejecutó Python 3.14.10 y pasó <code>pip check</code>. Se verificó el contenido del directorio de trabajo y se observó el estado <code>healthy</code>. Respondieron con 200 <code>/health</code>, <code>/ready</code>, <code>/external-services</code> y <code>/providers/me</code>. <code>POST /spaces</code> devolvió 201, consultó autenticación y eventos, y el espacio apareció en el listado. Los logs revisados registraron el arranque y las peticiones esperadas.</p>
+    <footer>5 / 6</footer>
+  </section>
+  <section class="sheet">
+    <h2 id="incidencias">11. Problemas encontrados y soluciones aplicadas</h2>
+    <p>El Dockerfile previo usaba Python 3.10, copiaba el contexto completo y ejecutaba las pruebas durante la construcción. La nueva imagen instala las dependencias de ejecución, copia el árbol de código y declara el mando de Uvicorn y la sonda. Las dependencias de pruebas siguen disponibles para un entorno separado.</p>
+    <p>El motor Linux de Docker Desktop estaba detenido al iniciar la revisión. Para la prueba se arrancó el motor y se usó el proyecto aislado <code>subsonic-andrea</code>. Una sobreescritura temporal de Compose fijó <code>image: subsonic-provider:test</code> y <code>build: !reset null</code> solo para <code>provider</code>. Así se conservó la imagen de seed del Compose de referencia.</p>
+    <h2>12. Conclusiones</h2>
+    <p>Proveedores dispone de una imagen específica que utiliza las convenciones de contexto, puerto y DNS acordadas para la práctica. Para cerrar la memoria, reunir las evidencias del Compose integrado, la navegación en la SPA y la validación de cada servicio.</p>
+    <h2>13. Anexos y aportaciones pendientes</h2>
+    <figure>
+      <pre>Uvicorn running on http://0.0.0.0:8000
+200 http://127.0.0.1:8000/ready
+201 http://127.0.0.1:8000/spaces
+Tables created by application without seed: external_services,
+providers, space_proposals, spaces</pre>
+      <figcaption>Figura 3. Extractos del arranque y la prueba de integración. La prueba de creación de tablas arrancó Uvicorn en 8009 dentro del contenedor y usó una base de datos inicialmente vacía.</figcaption>
+    </figure>
+    <table>
+      <tr><th>Responsable</th><th>Evidencias para la edición definitiva</th></tr>
+      <tr><td>Julia</td><td>Construcción, contenedor activo y respuesta de readiness de autenticación.</td></tr>
+      <tr><td>Óscar</td><td>Construcción de catálogo y frontend, captura de la SPA y peticiones a través de Nginx.</td></tr>
+      <tr><td>Álvaro</td><td>Eventos operativo, configuración de Compose, dependencias, contenedores y healthchecks de la pila final.</td></tr>
+      <tr><td>Borja</td><td>Construcción de comercio, salidas de smoke y de pruebas del despliegue, con comunicaciones verificadas.</td></tr>
+    </table>
+    <p>Para cada evidencia, registrar la rama o commit, la fecha, el comando, el resultado observable y los servicios implicados. Añadir las capturas junto a su apartado con un pie numerado. Omitir credenciales, tokens y valores privados. Actualizar el índice y revisar la paginación al exportar el PDF definitivo.</p>
+    <footer>6 / 6</footer>
+  </section>
+</body>
+</html>
