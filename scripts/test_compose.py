@@ -210,7 +210,13 @@ def validate_container_state(project):
 def run_service_tests(service, project):
     print(f"[ RUN ] suites de {service}")
     result = subprocess.run(
-        command(["exec", "-T", service, "python", "-", service], project),
+        command(
+            [
+                "run", "--rm", "-T", "--no-deps", f"{service}-seed",
+                "python", "-", service,
+            ],
+            project,
+        ),
         cwd=ROOT,
         input=WORKER,
         text=True,
