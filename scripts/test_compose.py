@@ -70,11 +70,18 @@ def command(args, project):
     return ["docker", "compose", "-p", project, *args]
 
 
+def combined_output(result):
+    """Return captured command output even when one stream is unavailable."""
+    return ((result.stdout or "") + (result.stderr or "")).strip()
+
+
 def run_command(args, project, *, check=False):
     return subprocess.run(
         command(args, project),
         cwd=ROOT,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=check,
     )
@@ -82,7 +89,7 @@ def run_command(args, project, *, check=False):
 
 def compose_logs(service, project):
     result = run_command(["logs", "--no-color", "--tail", str(LOG_LINES), service], project)
-    output = (result.stdout + result.stderr).strip()
+    output = combined_output(result)
     return redact(output) if output else "<no logs>"
 
 
@@ -120,6 +127,8 @@ def validate_docker_and_config(project):
             ["docker", "version", "--format", "{{.Server.Version}}"],
             cwd=ROOT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             capture_output=True,
             check=False,
         )
@@ -128,15 +137,15 @@ def validate_docker_and_config(project):
     if docker.returncode != 0:
         raise ComposeValidationError(
             "Docker no está disponible o el daemon no responde:\n"
-            + redact(docker.stderr.strip())
+            + redact((docker.stderr or "").strip())
         )
-    print(f"[ OK ] Docker daemon disponible ({docker.stdout.strip()})")
+    print(f"[ OK ] Docker daemon disponible ({(docker.stdout or '').strip()})")
 
     config = run_command(["config", "--quiet"], project)
     if config.returncode != 0:
         raise ComposeValidationError(
             "Fase Compose config: configuración inválida:\n"
-            + redact((config.stdout + config.stderr).strip())
+            + redact(combined_output(config))
         )
     print("[ OK ] docker compose config --quiet")
 
@@ -144,9 +153,9 @@ def validate_docker_and_config(project):
     if services.returncode != 0:
         raise ComposeValidationError(
             "Fase Compose services: no se pudieron consultar los servicios:\n"
-            + redact(services.stderr.strip())
+            + redact((services.stderr or "").strip())
         )
-    actual = set(services.stdout.split())
+    actual = set((services.stdout or "").split())
     missing = sorted(EXPECTED_SERVICES - actual)
     if missing:
         raise ComposeValidationError(
@@ -161,9 +170,9 @@ def validate_container_state(project):
     if result.returncode != 0:
         raise ComposeValidationError(
             "Fase estado de contenedores: no se pudo ejecutar docker compose ps:\n"
-            + redact((result.stdout + result.stderr).strip())
+            + redact(combined_output(result))
         )
-    records = parse_ps(result.stdout)
+    records = parse_ps(result.stdout or "")
     states = {}
     for record in records:
         service, state, health, exit_code = record_service(record)
@@ -220,10 +229,12 @@ def run_service_tests(service, project):
         cwd=ROOT,
         input=WORKER,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )
-    output = redact((result.stdout + result.stderr).strip())
+    output = redact(combined_output(result))
     if result.returncode != 0:
         raise ComposeValidationError(
             f"Fase tests de {service}: exit={result.returncode}.\n"
