@@ -1,0 +1,9 @@
+**
+!provider-service/generated/requirements.txt
+!provider-service/generated/src/
+!provider-service/generated/src/**/*.py
+**/__pycache__
+**/.venv
+**/.pytest_cache
+**/tests
+**/seed.py
