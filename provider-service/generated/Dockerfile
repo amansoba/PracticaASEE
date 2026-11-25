@@ -1,30 +1,18 @@
-FROM python:3.10 AS builder
+FROM python:3.14-slim
 
-WORKDIR /usr/src/app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/provider-service/generated/src
 
-RUN python3 -m venv /venv
-ENV PATH="/venv/bin:$PATH"
+WORKDIR /app/provider-service/generated
 
-RUN pip install --upgrade pip
+COPY provider-service/generated/requirements.txt ./requirements.txt
+RUN python -m pip install --no-cache-dir -r requirements.txt
 
-COPY . .
-RUN pip install --no-cache-dir .
+COPY provider-service/generated/src ./src
 
+EXPOSE 8000
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=20 \
+    CMD ["python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/ready', timeout=2).close()"]
 
-FROM python:3.10 AS test_runner
-WORKDIR /tmp
-COPY --from=builder /venv /venv
-COPY --from=builder /usr/src/app/tests tests
-ENV PATH=/venv/bin:$PATH
-
-# install test dependencies
-RUN pip install pytest
-
-# run tests
-RUN pytest tests
-
-
-FROM python:3.10 AS service
-WORKDIR /root/app/site-packages
-COPY --from=test_runner /venv /venv
-ENV PATH=/venv/bin:$PATH
+CMD ["python", "-m", "uvicorn", "openapi_server.main:app", "--host", "0.0.0.0", "--port", "8000"]
