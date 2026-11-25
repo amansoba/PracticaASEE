@@ -1,0 +1,12 @@
+# Repository-root context supplies the shared seed script.
+**
+!catalog-service/generated/requirements.txt
+!catalog-service/generated/src/
+!scripts/seed.py
+
+**/.env
+**/.env.*
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/*.py[cod]
